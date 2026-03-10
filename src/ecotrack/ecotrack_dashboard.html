@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EcoTrack — Global Sustainability Intelligence</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:       #0b0f0e;
+    --card:     #111815;
+    --border:   #1e2b27;
+    --green1:   #00ff87;
+    --green2:   #00c96d;
+    --green3:   #00945a;
+    --muted:    #4a6b60;
+    --text:     #e8f5f0;
+    --textsec:  #8ab8a8;
+    --danger:   #ff4d6d;
+    --warn:     #ffb347;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  /* Header */
+  .header {
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    padding: 18px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo { display: flex; align-items: center; gap: 12px; }
+  .logo-icon { font-size: 24px; }
+  .logo-text { font-size: 20px; font-weight: 900; letter-spacing: 4px; }
+  .logo-text span { color: var(--green1); }
+  .header-sub { color: var(--muted); font-size: 10px; letter-spacing: 2px; }
+  .header-year { color: var(--green3); font-size: 10px; }
+
+  /* Tabs */
+  .tabs {
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    padding: 0 32px;
+    gap: 4px;
+  }
+  .tab {
+    padding: 14px 20px;
+    cursor: pointer;
+    color: var(--muted);
+    font-size: 11px;
+    letter-spacing: 1px;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .tab:hover { color: var(--textsec); }
+  .tab.active { color: var(--green1); border-bottom-color: var(--green1); }
+
+  /* Content */
+  .content { padding: 24px 32px; }
+  .tab-pane { display: none; }
+  .tab-pane.active { display: block; }
+
+  /* KPIs */
+  .kpi-row { display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+  .kpi {
+    flex: 1; min-width: 160px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-top: 2px solid var(--green1);
+    padding: 18px 22px;
+    border-radius: 6px;
+  }
+  .kpi.warn { border-top-color: var(--warn); }
+  .kpi.danger { border-top-color: var(--danger); }
+  .kpi.green2 { border-top-color: var(--green2); }
+  .kpi-label { font-size: 9px; color: var(--textsec); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 8px; }
+  .kpi-value { font-size: 28px; font-weight: 700; color: var(--green1); }
+  .kpi.warn .kpi-value { color: var(--warn); }
+  .kpi.danger .kpi-value { color: var(--danger); }
+  .kpi.green2 .kpi-value { color: var(--green2); }
+  .kpi-unit { font-size: 11px; color: var(--muted); }
+
+  /* Cards */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+  .card-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: var(--green1);
+    text-transform: uppercase;
+  }
+  .card-body { padding: 18px; }
+
+  /* Row layouts */
+  .row-2 { display: flex; gap: 16px; margin-bottom: 20px; }
+  .row-2 > * { flex: 1; }
+  .row-2 > .wide { flex: 2; }
+
+  /* Canvas containers */
+  .chart-wrap { position: relative; }
+
+  /* Controls */
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .controls label { color: var(--muted); font-size: 10px; letter-spacing: 1px; }
+  .controls select {
+    background: var(--card);
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 6px 12px;
+    font-family: inherit;
+    font-size: 11px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .controls select:focus { outline: none; border-color: var(--green3); }
+
+  /* Table */
+  .data-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .data-table th {
+    text-align: left;
+    color: var(--muted);
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .data-table td { padding: 9px 12px; border-bottom: 1px solid var(--border); color: var(--text); }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table tr:hover td { background: rgba(0,255,135,0.03); }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 700;
+  }
+  .badge-green { background: rgba(0,255,135,0.15); color: var(--green1); }
+  .badge-warn  { background: rgba(255,179,71,0.15);  color: var(--warn);   }
+  .badge-muted { background: rgba(74,107,96,0.25);   color: var(--textsec); }
+
+  /* Rank medal */
+  .rank { font-weight: 700; }
+  .rank-1 { color: #ffd700; }
+  .rank-2 { color: #c0c0c0; }
+  .rank-3 { color: #cd7f32; }
+
+  /* Progress bar */
+  .pbar-wrap { background: var(--border); border-radius: 2px; height: 6px; flex: 1; }
+  .pbar { height: 6px; border-radius: 2px; background: var(--green1); }
+  .pbar-row { display: flex; align-items: center; gap: 10px; margin: 4px 0; }
+  .pbar-label { min-width: 90px; font-size: 10px; color: var(--textsec); }
+  .pbar-val { min-width: 40px; text-align: right; font-size: 10px; color: var(--green1); }
+
+  /* Heatmap cell */
+  .hm-table { border-collapse: collapse; font-size: 10px; width: 100%; }
+  .hm-table th { padding: 6px 4px; color: var(--muted); font-size: 9px; letter-spacing: 1px; text-align: center; }
+  .hm-table td { padding: 3px 4px; text-align: center; font-size: 9px; }
+
+  /* Scrollable */
+  .scroll-x { overflow-x: auto; }
+  .scroll-y { overflow-y: auto; max-height: 600px; }
+
+  /* Sparkline SVG inline */
+  .spark { display: inline-block; vertical-align: middle; }
+
+  footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: 10px;
+    padding: 32px;
+    border-top: 1px solid var(--border);
+    letter-spacing: 2px;
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="logo">
+    <span class="logo-icon">♻</span>
+    <div class="logo-text"><span>ECO</span>TRACK</div>
+  </div>
+  <div class="header-sub">Global Sustainability &amp; Waste Intelligence Platform</div>
+  <div class="header-year">Data through 2023 &nbsp;|&nbsp; 30 Countries</div>
+</header>
+
+<!-- TABS -->
+<nav class="tabs">
+  <div class="tab active" onclick="showTab('overview')">📊 Overview</div>
+  <div class="tab" onclick="showTab('leaderboard')">🏆 Leaderboard</div>
+  <div class="tab" onclick="showTab('trends')">📈 Country Trends</div>
+  <div class="tab" onclick="showTab('materials')">🧪 Materials</div>
+  <div class="tab" onclick="showTab('heatmap')">🗺️ Heatmap</div>
+  <div class="tab" onclick="showTab('analytics')">🔬 Analytics</div>
+</nav>
+
+<!-- CONTENT -->
+<main class="content">
+
+<!-- ════════════════════════════════════════════════════════ OVERVIEW -->
+<div id="tab-overview" class="tab-pane active">
+
+  <div class="kpi-row">
+    <div class="kpi">
+      <div class="kpi-label">Countries Tracked</div>
+      <div class="kpi-value">30</div>
+      <div class="kpi-unit">nations monitored</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Avg Recycling Rate</div>
+      <div class="kpi-value">35.9%</div>
+      <div class="kpi-unit">global average 2023</div>
+    </div>
+    <div class="kpi warn">
+      <div class="kpi-label">Avg Waste / Capita</div>
+      <div class="kpi-value">458</div>
+      <div class="kpi-unit">kg per person per year</div>
+    </div>
+    <div class="kpi green2">
+      <div class="kpi-label">Top Recycler 2023</div>
+      <div class="kpi-value" style="font-size:20px">Germany</div>
+      <div class="kpi-unit">highest overall rate</div>
+    </div>
+  </div>
+
+  <div class="row-2">
+    <div class="card wide">
+      <div class="card-header">♻ Recycling Rates by Region — 2023</div>
+      <div class="card-body"><div class="chart-wrap"><canvas id="regionRadar" height="280"></canvas></div></div>
+    </div>
+    <div class="card">
+      <div class="card-header">🌍 Countries by Region</div>
+      <div class="card-body"><div class="chart-wrap"><canvas id="regionDonut" height="280"></canvas></div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">🧪 Global Material Generation vs Recycling — 2023</div>
+    <div class="card-body"><div class="chart-wrap"><canvas id="materialBar" height="200"></canvas></div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">📈 Top 10 Recycling Improvers (2015 → 2023)</div>
+    <div class="card-body">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>#</th><th>Country</th><th>Region</th>
+            <th>Start Rate</th><th>End Rate</th><th>Improvement</th><th>Progress</th>
+          </tr>
+        </thead>
+        <tbody id="improvers-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /overview -->
+
+<!-- ════════════════════════════════════════════════════════ LEADERBOARD -->
+<div id="tab-leaderboard" class="tab-pane">
+
+  <div class="controls">
+    <label>YEAR</label>
+    <select id="lb-year-sel" onchange="updateLeaderboard()"></select>
+  </div>
+
+  <div class="card">
+    <div class="card-header">🏆 Recycling Rate Leaderboard</div>
+    <div class="card-body scroll-y">
+      <table class="data-table" id="lb-table">
+        <thead>
+          <tr>
+            <th>Rank</th><th>Country</th><th>Region</th>
+            <th>Overall</th><th>Plastic</th><th>Paper</th>
+            <th>Glass</th><th>Metal</th><th>Organic</th>
+          </tr>
+        </thead>
+        <tbody id="lb-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">📊 Visual Ranking</div>
+    <div class="card-body"><div class="chart-wrap"><canvas id="lb-chart" height="500"></canvas></div></div>
+  </div>
+
+</div><!-- /leaderboard -->
+
+<!-- ════════════════════════════════════════════════════════ TRENDS -->
+<div id="tab-trends" class="tab-pane">
+
+  <div class="controls">
+    <label>COUNTRY</label>
+    <select id="trend-sel" onchange="updateTrend()"></select>
+  </div>
+
+  <div class="row-2">
+    <div class="card wide">
+      <div class="card-header">📈 Waste Generation Trend (kg / capita)</div>
+      <div class="card-body"><div class="chart-wrap"><canvas id="trendWaste" height="280"></canvas></div></div>
+    </div>
+    <div class="card">
+      <div class="card-header">♻ Recycling Rates Trend (%)</div>
+      <div class="card-body"><div class="chart-wrap"><canvas id="trendRecycle" height="280"></canvas></div></div>
+    </div>
+  </div>
+
+</div><!-- /trends -->
+
+<!-- ════════════════════════════════════════════════════════ MATERIALS -->
+<div id="tab-materials" class="tab-pane">
+
+  <div class="controls">
+    <label>YEAR</label>
+    <select id="mf-year-sel" onchange="updateMaterial()"></select>
+    <label>MATERIAL</label>
+    <select id="mf-mat-sel" onchange="updateMaterial()">
+      <option value="plastic">Plastic</option>
+      <option value="paper">Paper</option>
+      <option value="glass">Glass</option>
+      <option value="metal">Metal</option>
+      <option value="organic">Organic</option>
+      <option value="other">Other</option>
+    </select>
+  </div>
+
+  <div class="row-2">
+    <div class="card wide">
+      <div class="card-header">♻ Recycling Rate by Country &amp; Material</div>
+      <div class="card-body"><div class="chart-wrap"><canvas id="mf-chart" height="420"></canvas></div></div>
+    </div>
+    <div class="card">
+      <div class="card-header">🥧 Fate of Selected Material</div>
+      <div class="card-body"><div class="chart-wrap"><canvas id="mf-fate" height="280"></canvas></div></div>
+    </div>
+  </div>
+
+</div><!-- /materials -->
+
+<!-- ════════════════════════════════════════════════════════ HEATMAP -->
+<div id="tab-heatmap" class="tab-pane">
+  <div class="card">
+    <div class="card-header">🗺️ Recycling Rate Heatmap — All Countries × Materials (2023)</div>
+    <div class="card-body scroll-x">
+      <div id="heatmap-container"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════ ANALYTICS -->
+<div id="tab-analytics" class="tab-pane">
+
+  <div class="row-2">
+    <div class="card">
+      <div class="card-header">🔬 Efficiency Score — Top 15</div>
+      <div class="card-body"><div class="chart-wrap"><canvas id="effChart" height="320"></canvas></div></div>
+    </div>
+    <div class="card">
+      <div class="card-header">💰 Wealth vs Waste</div>
+      <div class="card-body"><div class="chart-wrap"><canvas id="scatterChart" height="320"></canvas></div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">📉 Global Waste Generation Trend</div>
+    <div class="card-body"><div class="chart-wrap"><canvas id="globalTrendChart" height="200"></canvas></div></div>
+  </div>
+
+</div><!-- /analytics -->
+
+</main>
+
+<footer>ECOTRACK v1.0 &nbsp;|&nbsp; Data: World Bank · OECD · Eurostat · UN Environment · Global E-waste Monitor</footer>
+
+<script>
+// ══════════════════════════════════════════════════════════
+//  EMBEDDED DATA
+// ══════════════════════════════════════════════════════════
+const DATA = {"latest_year": 2023, "countries": [{"id": 22, "country": "Australia", "country_code": "AUS", "region": "Asia-Pacific", "population": 25700000, "gdp_per_capita": 54000.0, "updated_at": "2026-03-04 23:56:09", "latest_year": 2023, "total_waste_kg_cap": 648.25, "recycling_rate": 37.6}, {"id": 5, "country": "Austria", "country_code": "AUT", "region": "Europe", "population": 9000000, "gdp_per_capita": 50000.0, "updated_at": "2026-03-04 23:56:09", "latest_year": 2023, "total_waste_kg_cap": 562.52, "recycling_rate": 59.8}, {"id": 8, "country": "Belgium", "country_code": "BEL", "region": "Europe", "population": 11500000, "gdp_per_capita": 46000.0, "updated_at": "2026-03-04 23:56:09", "latest_year": 2023, "total_waste_kg_cap": 519.47, "recycling_rate": 56.8}, {"id": 17, "country": "Brazil", "country_code": "BRA", "region": "Americas", "population": 213000000, "gdp_per_capita": 8000.0, "updated_at": "2026-03-04 23:56:09", "latest_year": 2023, "total_waste_kg_cap": 292.41, "recycling_rate": 4.1}, {"id": 16, "country": "Canada", "country_code": "CAN", "region": "Americas", "population": 38200000, "gdp_per_capita": 52000.0, "updated_at": "2026-03-04 23:56:09", "latest_year": 2023, "total_waste_kg_cap": 706.49, "recycling_rate": 29.9}, {"id": 19, "country": "Chile", "country_code": "CHL", "region": "Americas", "population": 19100000, "gdp_per_capita": 16000.0, "updated_at": "2026-03-04 23:56:09", "latest_year": 2023, "total_waste_kg_cap": 400.45, "recycling_rate": 10.8}, {"id": 25, "country": "China", "country_code": "CHN", "region": "Asia-Pacific", "population": 1412000000, "gdp_per_capita": 12000.0, "updated_at": "2026-03-04 23:56:09", "latest_year": 2023, "total_waste_kg_cap": 241.48, "recycling_rate": 20.0}, {"id": 6, "country": "Denmark", "country_code": "DNK", "region": "Europe", "population": 5900000, "gdp_per_capita": 61000.0, "updated_at": "2026-03-04 23:56:09", "latest_year": 2023, "total_waste_kg_cap": 788.83, "recycling_rate": 54.7}, {"id": 7, "country": "Finland", "country_code": "FIN", "region": "Europe", "population": 5500000, "gdp_per_capita": 49000.0, "updated_at": "2026-03-04 23:56:09", "latest_year": 2023, "total_waste_kg_cap": 498.9, "recycling_rate": 43.5}, {"id": 10, "country": "France", "country_code": "FRA", "region": "Europe", "population": 67800000, "gdp_per_capita": 42000.0, "updated_at": "2026-03-04 23:56:09", "latest_year": 2023, "total_waste_kg_cap": 562.01, "recycling_rate": 45.0}, {"id": 1, "country": "Germany", "country_code": "DEU", "region": "Europe", "population": 83200000, "gdp_per_capita": 46000.0, "updated_at": "2026-03-04 23:56:09", "latest_year": 2023, "total_waste_kg_cap": 613.05, "recycling_rate": 66.4}, {"id": 26, "country": "India", "country_code": "IND", "region": "Asia-Pacific", "population": 1380000000, "gdp_per_capita": 2200.0, "updated_at": "2026-03-04 23:56:09", "latest_year": 2023, "total_waste_kg_cap": 135.83, "recycling_rate": 15.1}, {"id": 12, "country": "Italy", "country_code": "ITA", "region": "Europe", "population": 60400000, "gdp_per_capita": 35000.0, "updated_at": "2026-03-04 23:56:09", "latest_year": 2023, "total_waste_kg_cap": 497.92, "recycling_rate": 50.1}, {"id": 20, "country": "Japan", "country_code": "JPN", "region": "Asia-Pacific", "population": 125700000, "gdp_per_capita": 40000.0, "updated_at": "2026-03-04 23:56:09", "latest_year": 2023, "total_waste_kg_cap": 332.44, "recycling_rate": 19.6}, {"id": 29, "country": "Kenya", "country_code": "KEN", "region": "Africa", "population": 54000000, "gdp_per_capita": 2000.0, "updated_at": "2026-03-04 23:56:09", "latest_year": 2023, "total_waste_kg_cap": 124.62, "recycling_rate": 7.8}, {"id": 18, "country": "Mexico", "country_code": "MEX", "region": "Americas", "population": 129000000, "gdp_per_capita": 10000.0, "updated_at": "2026-03-04 23:56:09", "latest_year": 2023, "total_waste_kg_cap": 356.25, "recycling_rate": 5.5}, {"id": 3, "country": "Netherlands", "country_code": "NLD", "region": "Europe", "population": 17600000, "gdp_per_capita": 52000.0, "updated_at": "2026-03-04 23:56:09", "latest_year": 2023, "total_waste_kg_cap": 545.74, "recycling_rate": 60.3}, {"id": 24, "country": "New Zealand", "country_code": "NZL", "region": "Asia-Pacific", "population": 5000000, "gdp_per_capita": 41000.0, "updated_at": "2026-03-04 23:56:09", "latest_year": 2023, "total_waste_kg_cap": 791.71, "recycling_rate": 28.4}, {"id": 28, "country": "Nigeria", "country_code": "NGA", "region": "Africa", "population": 211000000, "gdp_per_capita": 2100.0, "updated_at": "2026-03-04 23:56:09", "latest_year": 2023, "total_waste_kg_cap": 188.93, "recycling_rate": 2.6}, {"id": 9, "country": "Norway", "country_code": "NOR", "region": "Europe", "population": 5400000, "gdp_per_capita": 82000.0, "updated_at": "2026-03-04 23:56:09", "latest_year": 2023, "total_waste_kg_cap": 419.71, "recycling_rate": 48.0}, {"id": 14, "country": "Poland", "country_code": "POL", "region": "Europe", "population": 38000000, "gdp_per_capita": 18000.0, "updated_at": "2026-03-04 23:56:09", "latest_year": 2023, "total_waste_kg_cap": 324.29, "recycling_rate": 35.8}, {"id": 23, "country": "Singapore", "country_code": "SGP", "region": "Asia-Pacific", "population": 5900000, "gdp_per_capita": 59000.0, "updated_at": "2026-03-04 23:56:09", "latest_year": 2023, "total_waste_kg_cap": 127.06, "recycling_rate": 53.0}, {"id": 27, "country": "South Africa", "country_code": "ZAF", "region": "Africa", "population": 59300000, "gdp_per_capita": 7000.0, "updated_at": "2026-03-04 23:56:09", "latest_year": 2023, "total_waste_kg_cap": 196.61, "recycling_rate": 12.0}, {"id": 21, "country": "South Korea", "country_code": "KOR", "region": "Asia-Pacific", "population": 51700000, "gdp_per_capita": 35000.0, "updated_at": "2026-03-04 23:56:09", "latest_year": 2023, "total_waste_kg_cap": 368.7, "recycling_rate": 60.1}, {"id": 13, "country": "Spain", "country_code": "ESP", "region": "Europe", "population": 47300000, "gdp_per_capita": 30000.0, "updated_at": "2026-03-04 23:56:09", "latest_year": 2023, "total_waste_kg_cap": 439.5, "recycling_rate": 36.3}, {"id": 2, "country": "Sweden", "country_code": "SWE", "region": "Europe", "population": 10400000, "gdp_per_capita": 54000.0, "updated_at": "2026-03-04 23:56:09", "latest_year": 2023, "total_waste_kg_cap": 488.83, "recycling_rate": 66.4}, {"id": 4, "country": "Switzerland", "country_code": "CHE", "region": "Europe", "population": 8700000, "gdp_per_capita": 85000.0, "updated_at": "2026-03-04 23:56:09", "latest_year": 2023, "total_waste_kg_cap": 687.96, "recycling_rate": 53.1}, {"id": 30, "country": "UAE", "country_code": "ARE", "region": "Middle East", "population": 10000000, "gdp_per_capita": 44000.0, "updated_at": "2026-03-04 23:56:09", "latest_year": 2023, "total_waste_kg_cap": 610.85, "recycling_rate": 17.5}, {"id": 11, "country": "United Kingdom", "country_code": "GBR", "region": "Europe", "population": 67300000, "gdp_per_capita": 46000.0, "updated_at": "2026-03-04 23:56:09", "latest_year": 2023, "total_waste_kg_cap": 470.45, "recycling_rate": 43.4}, {"id": 15, "country": "United States", "country_code": "USA", "region": "Americas", "population": 331000000, "gdp_per_capita": 63000.0, "updated_at": "2026-03-04 23:56:09", "latest_year": 2023, "total_waste_kg_cap": 785.15, "recycling_rate": 32.8}], "leaderboard": [{"country": "Germany", "country_code": "DEU", "region": "Europe", "year": 2023, "overall_rate": 66.4, "plastic_rate": 46.9, "paper_rate": 85.6, "glass_rate": 85.7, "metal_rate": 91.1, "organic_rate": 75.5}, {"country": "Sweden", "country_code": "SWE", "region": "Europe", "year": 2023, "overall_rate": 66.4, "plastic_rate": 38.6, "paper_rate": 76.5, "glass_rate": 71.1, "metal_rate": 86.5, "organic_rate": 67.9}, {"country": "Netherlands", "country_code": "NLD", "region": "Europe", "year": 2023, "overall_rate": 60.3, "plastic_rate": 43.9, "paper_rate": 80.1, "glass_rate": 75.9, "metal_rate": 89.6, "organic_rate": 64.5}, {"country": "South Korea", "country_code": "KOR", "region": "Asia-Pacific", "year": 2023, "overall_rate": 60.1, "plastic_rate": 57.4, "paper_rate": 89.9, "glass_rate": 75.2, "metal_rate": 90.1, "organic_rate": 64.5}, {"country": "Austria", "country_code": "AUT", "region": "Europe", "year": 2023, "overall_rate": 59.8, "plastic_rate": 39.2, "paper_rate": 79.7, "glass_rate": 86.3, "metal_rate": 89.0, "organic_rate": 73.4}, {"country": "Belgium", "country_code": "BEL", "region": "Europe", "year": 2023, "overall_rate": 56.8, "plastic_rate": 41.6, "paper_rate": 77.6, "glass_rate": 80.6, "metal_rate": 88.3, "organic_rate": 66.9}, {"country": "Denmark", "country_code": "DNK", "region": "Europe", "year": 2023, "overall_rate": 54.7, "plastic_rate": 36.9, "paper_rate": 74.1, "glass_rate": 80.7, "metal_rate": 88.3, "organic_rate": 57.3}, {"country": "Switzerland", "country_code": "CHE", "region": "Europe", "year": 2023, "overall_rate": 53.1, "plastic_rate": 33.1, "paper_rate": 76.8, "glass_rate": 96.1, "metal_rate": 94.0, "organic_rate": 77.5}, {"country": "Singapore", "country_code": "SGP", "region": "Asia-Pacific", "year": 2023, "overall_rate": 53.0, "plastic_rate": 4.2, "paper_rate": 49.6, "glass_rate": 13.1, "metal_rate": 98.3, "organic_rate": 18.6}, {"country": "Italy", "country_code": "ITA", "region": "Europe", "year": 2023, "overall_rate": 50.1, "plastic_rate": 43.8, "paper_rate": 73.3, "glass_rate": 73.4, "metal_rate": 85.3, "organic_rate": 63.5}, {"country": "Norway", "country_code": "NOR", "region": "Europe", "year": 2023, "overall_rate": 48.0, "plastic_rate": 32.9, "paper_rate": 75.8, "glass_rate": 74.9, "metal_rate": 87.2, "organic_rate": 53.3}, {"country": "France", "country_code": "FRA", "region": "Europe", "year": 2023, "overall_rate": 45.0, "plastic_rate": 27.9, "paper_rate": 67.1, "glass_rate": 73.3, "metal_rate": 87.1, "organic_rate": 50.4}, {"country": "Finland", "country_code": "FIN", "region": "Europe", "year": 2023, "overall_rate": 43.5, "plastic_rate": 29.4, "paper_rate": 69.1, "glass_rate": 70.3, "metal_rate": 85.5, "organic_rate": 49.7}, {"country": "United Kingdom", "country_code": "GBR", "region": "Europe", "year": 2023, "overall_rate": 43.4, "plastic_rate": 32.0, "paper_rate": 67.5, "glass_rate": 69.0, "metal_rate": 86.7, "organic_rate": 49.2}, {"country": "Australia", "country_code": "AUS", "region": "Asia-Pacific", "year": 2023, "overall_rate": 37.6, "plastic_rate": 17.0, "paper_rate": 62.7, "glass_rate": 55.4, "metal_rate": 69.9, "organic_rate": 34.2}, {"country": "Spain", "country_code": "ESP", "region": "Europe", "year": 2023, "overall_rate": 36.3, "plastic_rate": 36.6, "paper_rate": 63.6, "glass_rate": 70.2, "metal_rate": 82.2, "organic_rate": 39.2}, {"country": "Poland", "country_code": "POL", "region": "Europe", "year": 2023, "overall_rate": 35.8, "plastic_rate": 32.2, "paper_rate": 55.8, "glass_rate": 59.9, "metal_rate": 77.9, "organic_rate": 30.9}, {"country": "United States", "country_code": "USA", "region": "Americas", "year": 2023, "overall_rate": 32.8, "plastic_rate": 9.0, "paper_rate": 66.0, "glass_rate": 31.3, "metal_rate": 67.0, "organic_rate": 24.6}, {"country": "Canada", "country_code": "CAN", "region": "Americas", "year": 2023, "overall_rate": 29.9, "plastic_rate": 11.4, "paper_rate": 59.9, "glass_rate": 40.6, "metal_rate": 65.0, "organic_rate": 20.2}, {"country": "New Zealand", "country_code": "NZL", "region": "Asia-Pacific", "year": 2023, "overall_rate": 28.4, "plastic_rate": 9.6, "paper_rate": 59.8, "glass_rate": 50.8, "metal_rate": 61.6, "organic_rate": 22.1}, {"country": "China", "country_code": "CHN", "region": "Asia-Pacific", "year": 2023, "overall_rate": 20.0, "plastic_rate": 24.9, "paper_rate": 52.1, "glass_rate": 40.0, "metal_rate": 86.3, "organic_rate": 15.1}, {"country": "Japan", "country_code": "JPN", "region": "Asia-Pacific", "year": 2023, "overall_rate": 19.6, "plastic_rate": 20.8, "paper_rate": 78.2, "glass_rate": 74.8, "metal_rate": 88.7, "organic_rate": 10.4}, {"country": "UAE", "country_code": "ARE", "region": "Middle East", "year": 2023, "overall_rate": 17.5, "plastic_rate": 16.0, "paper_rate": 55.6, "glass_rate": 46.0, "metal_rate": 72.4, "organic_rate": 10.4}, {"country": "India", "country_code": "IND", "region": "Asia-Pacific", "year": 2023, "overall_rate": 15.1, "plastic_rate": 15.7, "paper_rate": 40.1, "glass_rate": 20.2, "metal_rate": 60.0, "organic_rate": 10.2}, {"country": "South Africa", "country_code": "ZAF", "region": "Africa", "year": 2023, "overall_rate": 12.0, "plastic_rate": 14.7, "paper_rate": 58.5, "glass_rate": 22.3, "metal_rate": 67.6, "organic_rate": 5.2}, {"country": "Chile", "country_code": "CHL", "region": "Americas", "year": 2023, "overall_rate": 10.8, "plastic_rate": 10.3, "paper_rate": 44.7, "glass_rate": 41.7, "metal_rate": 67.5, "organic_rate": 5.2}, {"country": "Kenya", "country_code": "KEN", "region": "Africa", "year": 2023, "overall_rate": 7.8, "plastic_rate": 8.3, "paper_rate": 30.7, "glass_rate": 9.9, "metal_rate": 40.1, "organic_rate": 5.3}, {"country": "Mexico", "country_code": "MEX", "region": "Americas", "year": 2023, "overall_rate": 5.5, "plastic_rate": 6.3, "paper_rate": 30.2, "glass_rate": 35.3, "metal_rate": 65.0, "organic_rate": 3.1}, {"country": "Brazil", "country_code": "BRA", "region": "Americas", "year": 2023, "overall_rate": 4.1, "plastic_rate": 5.2, "paper_rate": 44.9, "glass_rate": 47.4, "metal_rate": 75.1, "organic_rate": 2.0}, {"country": "Nigeria", "country_code": "NGA", "region": "Africa", "year": 2023, "overall_rate": 2.6, "plastic_rate": 3.2, "paper_rate": 20.2, "glass_rate": 5.0, "metal_rate": 45.1, "organic_rate": 2.1}], "mat_global": [{"material": "organic", "total_generated_kt": 408384.0, "total_recycled_kt": 90507.0, "total_landfilled_kt": 158934.0, "global_recycle_pct": 22.2}, {"material": "paper", "total_generated_kt": 301780.0, "total_recycled_kt": 169643.0, "total_landfilled_kt": 112418.0, "global_recycle_pct": 56.2}, {"material": "other", "total_generated_kt": 197277.0, "total_recycled_kt": 7891.0, "total_landfilled_kt": 160992.0, "global_recycle_pct": 4.0}, {"material": "plastic", "total_generated_kt": 141837.0, "total_recycled_kt": 27183.0, "total_landfilled_kt": 97564.0, "global_recycle_pct": 19.2}, {"material": "glass", "total_generated_kt": 81755.0, "total_recycled_kt": 34386.0, "total_landfilled_kt": 40404.0, "global_recycle_pct": 42.1}, {"material": "metal", "total_generated_kt": 46933.0, "total_recycled_kt": 35130.0, "total_landfilled_kt": 10047.0, "global_recycle_pct": 74.9}], "efficiency": [{"country": "Sweden", "country_code": "SWE", "region": "Europe", "overall_rate": 66.4, "plastic_rate": 38.6, "e_waste_rate": 53.7, "organic_rate": 67.9, "total_waste_kg_cap": 488.83, "food_waste_kg_cap": 64.66, "waste_penalty": 61.74356772050371, "efficiency_score": 58.5}, {"country": "South Korea", "country_code": "KOR", "region": "Asia-Pacific", "overall_rate": 60.1, "plastic_rate": 57.4, "e_waste_rate": 52.9, "organic_rate": 64.5, "total_waste_kg_cap": 368.7, "food_waste_kg_cap": 43.93, "waste_penalty": 46.57008247969585, "efficiency_score": 58.2}, {"country": "Germany", "country_code": "DEU", "region": "Europe", "overall_rate": 66.4, "plastic_rate": 46.9, "e_waste_rate": 46.6, "organic_rate": 75.5, "total_waste_kg_cap": 613.05, "food_waste_kg_cap": 52.25, "waste_penalty": 77.4336562630256, "efficiency_score": 55.5}, {"country": "Singapore", "country_code": "SGP", "region": "Asia-Pacific", "overall_rate": 53.0, "plastic_rate": 4.2, "e_waste_rate": 62.4, "organic_rate": 18.6, "total_waste_kg_cap": 127.06, "food_waste_kg_cap": 73.06, "waste_penalty": 16.048805749580023, "efficiency_score": 54.2}, {"country": "Austria", "country_code": "AUT", "region": "Europe", "overall_rate": 59.8, "plastic_rate": 39.2, "e_waste_rate": 47.1, "organic_rate": 73.4, "total_waste_kg_cap": 562.52, "food_waste_kg_cap": 57.86, "waste_penalty": 71.05126877265666, "efficiency_score": 53.8}, {"country": "Netherlands", "country_code": "NLD", "region": "Europe", "overall_rate": 60.3, "plastic_rate": 43.9, "e_waste_rate": 45.5, "organic_rate": 64.5, "total_waste_kg_cap": 545.74, "food_waste_kg_cap": 76.8, "waste_penalty": 68.93180583799622, "efficiency_score": 52.3}, {"country": "Belgium", "country_code": "BEL", "region": "Europe", "overall_rate": 56.8, "plastic_rate": 41.6, "e_waste_rate": 46.0, "organic_rate": 66.9, "total_waste_kg_cap": 519.47, "food_waste_kg_cap": 68.28, "waste_penalty": 65.61367167270843, "efficiency_score": 52.2}, {"country": "Switzerland", "country_code": "CHE", "region": "Europe", "overall_rate": 53.1, "plastic_rate": 33.1, "e_waste_rate": 54.4, "organic_rate": 77.5, "total_waste_kg_cap": 687.96, "food_waste_kg_cap": 68.38, "waste_penalty": 86.89545414356267, "efficiency_score": 50.2}, {"country": "Italy", "country_code": "ITA", "region": "Europe", "overall_rate": 50.1, "plastic_rate": 43.8, "e_waste_rate": 38.0, "organic_rate": 63.5, "total_waste_kg_cap": 497.92, "food_waste_kg_cap": 62.74, "waste_penalty": 62.89171540084122, "efficiency_score": 47.8}, {"country": "Norway", "country_code": "NOR", "region": "Europe", "overall_rate": 48.0, "plastic_rate": 32.9, "e_waste_rate": 40.9, "organic_rate": 53.3, "total_waste_kg_cap": 419.71, "food_waste_kg_cap": 56.61, "waste_penalty": 53.013098230412645, "efficiency_score": 47.4}, {"country": "United Kingdom", "country_code": "GBR", "region": "Europe", "overall_rate": 43.4, "plastic_rate": 32.0, "e_waste_rate": 38.1, "organic_rate": 49.2, "total_waste_kg_cap": 470.45, "food_waste_kg_cap": 92.25, "waste_penalty": 59.42201058468378, "efficiency_score": 42.9}, {"country": "Finland", "country_code": "FIN", "region": "Europe", "overall_rate": 43.5, "plastic_rate": 29.4, "e_waste_rate": 40.8, "organic_rate": 49.7, "total_waste_kg_cap": 498.9, "food_waste_kg_cap": 71.88, "waste_penalty": 63.01549809905141, "efficiency_score": 42.9}, {"country": "Denmark", "country_code": "DNK", "region": "Europe", "overall_rate": 54.7, "plastic_rate": 36.9, "e_waste_rate": 47.3, "organic_rate": 57.3, "total_waste_kg_cap": 788.83, "food_waste_kg_cap": 62.2, "waste_penalty": 99.63623043791287, "efficiency_score": 42.9}, {"country": "France", "country_code": "FRA", "region": "Europe", "overall_rate": 45.0, "plastic_rate": 27.9, "e_waste_rate": 39.7, "organic_rate": 50.4, "total_waste_kg_cap": 562.01, "food_waste_kg_cap": 85.23, "waste_penalty": 70.98685124603705, "efficiency_score": 41.8}, {"country": "Spain", "country_code": "ESP", "region": "Europe", "overall_rate": 36.3, "plastic_rate": 36.6, "e_waste_rate": 36.0, "organic_rate": 39.2, "total_waste_kg_cap": 439.5, "food_waste_kg_cap": 74.34, "waste_penalty": 55.5127508810044, "efficiency_score": 38.5}, {"country": "Poland", "country_code": "POL", "region": "Europe", "overall_rate": 35.8, "plastic_rate": 32.2, "e_waste_rate": 30.7, "organic_rate": 30.9, "total_waste_kg_cap": 324.29, "food_waste_kg_cap": 49.57, "waste_penalty": 40.960705308762044, "efficiency_score": 38.4}, {"country": "Australia", "country_code": "AUS", "region": "Asia-Pacific", "overall_rate": 37.6, "plastic_rate": 17.0, "e_waste_rate": 28.8, "organic_rate": 34.2, "total_waste_kg_cap": 648.25, "food_waste_kg_cap": 99.08, "waste_penalty": 81.87972868853494, "efficiency_score": 31.3}, {"country": "China", "country_code": "CHN", "region": "Asia-Pacific", "overall_rate": 20.0, "plastic_rate": 24.9, "e_waste_rate": 20.7, "organic_rate": 15.1, "total_waste_kg_cap": 241.48, "food_waste_kg_cap": 64.92, "waste_penalty": 30.50106730999987, "efficiency_score": 29.1}, {"country": "India", "country_code": "IND", "region": "Asia-Pacific", "overall_rate": 15.1, "plastic_rate": 15.7, "e_waste_rate": 2.2, "organic_rate": 10.2, "total_waste_kg_cap": 135.83, "food_waste_kg_cap": 48.65, "waste_penalty": 17.156534589685617, "efficiency_score": 25.1}, {"country": "Japan", "country_code": "JPN", "region": "Asia-Pacific", "overall_rate": 19.6, "plastic_rate": 20.8, "e_waste_rate": 15.8, "organic_rate": 10.4, "total_waste_kg_cap": 332.44, "food_waste_kg_cap": 51.1, "waste_penalty": 41.990122645918326, "efficiency_score": 24.7}, {"country": "South Africa", "country_code": "ZAF", "region": "Africa", "overall_rate": 12.0, "plastic_rate": 14.7, "e_waste_rate": 12.7, "organic_rate": 5.2, "total_waste_kg_cap": 196.61, "food_waste_kg_cap": 63.19, "waste_penalty": 24.83358805623271, "efficiency_score": 23.4}, {"country": "Canada", "country_code": "CAN", "region": "Americas", "overall_rate": 29.9, "plastic_rate": 11.4, "e_waste_rate": 20.6, "organic_rate": 20.2, "total_waste_kg_cap": 706.49, "food_waste_kg_cap": 75.77, "waste_penalty": 89.2359576107413, "efficiency_score": 22.3}, {"country": "Kenya", "country_code": "KEN", "region": "Africa", "overall_rate": 7.8, "plastic_rate": 8.3, "e_waste_rate": 5.3, "organic_rate": 5.3, "total_waste_kg_cap": 124.62, "food_waste_kg_cap": 52.2, "waste_penalty": 15.740612092811762, "efficiency_score": 22.1}, {"country": "United States", "country_code": "USA", "region": "Americas", "overall_rate": 32.8, "plastic_rate": 9.0, "e_waste_rate": 17.6, "organic_rate": 24.6, "total_waste_kg_cap": 785.15, "food_waste_kg_cap": 94.8, "waste_penalty": 99.17141377524598, "efficiency_score": 21.7}, {"country": "New Zealand", "country_code": "NZL", "region": "Asia-Pacific", "overall_rate": 28.4, "plastic_rate": 9.6, "e_waste_rate": 21.1, "organic_rate": 22.1, "total_waste_kg_cap": 791.71, "food_waste_kg_cap": 84.25, "waste_penalty": 100.0, "efficiency_score": 20.0}, {"country": "UAE", "country_code": "ARE", "region": "Middle East", "overall_rate": 17.5, "plastic_rate": 16.0, "e_waste_rate": 31.1, "organic_rate": 10.4, "total_waste_kg_cap": 610.85, "food_waste_kg_cap": 112.6, "waste_penalty": 77.15577673643126, "efficiency_score": 19.9}, {"country": "Chile", "country_code": "CHL", "region": "Americas", "overall_rate": 10.8, "plastic_rate": 10.3, "e_waste_rate": 10.7, "organic_rate": 5.2, "total_waste_kg_cap": 400.45, "food_waste_kg_cap": 66.01, "waste_penalty": 50.580389283954986, "efficiency_score": 17.4}, {"country": "Nigeria", "country_code": "NGA", "region": "Africa", "overall_rate": 2.6, "plastic_rate": 3.2, "e_waste_rate": 1.0, "organic_rate": 2.1, "total_waste_kg_cap": 188.93, "food_waste_kg_cap": 76.96, "waste_penalty": 23.863535890667038, "efficiency_score": 16.9}, {"country": "Brazil", "country_code": "BRA", "region": "Americas", "overall_rate": 4.1, "plastic_rate": 5.2, "e_waste_rate": 3.3, "organic_rate": 2.0, "total_waste_kg_cap": 292.41, "food_waste_kg_cap": 57.72, "waste_penalty": 36.933978350658705, "efficiency_score": 15.3}, {"country": "Mexico", "country_code": "MEX", "region": "Americas", "overall_rate": 5.5, "plastic_rate": 6.3, "e_waste_rate": 4.2, "organic_rate": 3.1, "total_waste_kg_cap": 356.25, "food_waste_kg_cap": 70.41, "waste_penalty": 44.99753697692337, "efficiency_score": 14.7}], "top_improvers": [{"country": "Netherlands", "region": "Europe", "first_year": 2015, "last_year": 2023, "start_rate": 54.8, "end_rate": 60.3, "improvement": 5.5}, {"country": "Sweden", "region": "Europe", "first_year": 2015, "last_year": 2023, "start_rate": 62.4, "end_rate": 66.4, "improvement": 4.0}, {"country": "Belgium", "region": "Europe", "first_year": 2015, "last_year": 2023, "start_rate": 53.3, "end_rate": 56.8, "improvement": 3.5}, {"country": "Finland", "region": "Europe", "first_year": 2015, "last_year": 2023, "start_rate": 40.1, "end_rate": 43.5, "improvement": 3.4}, {"country": "South Korea", "region": "Asia-Pacific", "first_year": 2015, "last_year": 2023, "start_rate": 56.8, "end_rate": 60.1, "improvement": 3.3}, {"country": "Austria", "region": "Europe", "first_year": 2015, "last_year": 2023, "start_rate": 56.8, "end_rate": 59.8, "improvement": 3.0}, {"country": "Singapore", "region": "Asia-Pacific", "first_year": 2015, "last_year": 2023, "start_rate": 50.6, "end_rate": 53.0, "improvement": 2.4}, {"country": "Denmark", "region": "Europe", "first_year": 2015, "last_year": 2023, "start_rate": 52.5, "end_rate": 54.7, "improvement": 2.2}, {"country": "Italy", "region": "Europe", "first_year": 2015, "last_year": 2023, "start_rate": 47.9, "end_rate": 50.1, "improvement": 2.2}, {"country": "Poland", "region": "Europe", "first_year": 2015, "last_year": 2023, "start_rate": 33.6, "end_rate": 35.8, "improvement": 2.2}], "global_summary": [{"year": 2015, "countries": 30, "avg_waste_kg_cap": 469.3, "avg_msw_kg_cap": 411.4, "min_waste": 127.2, "max_waste": 810.9}, {"year": 2016, "countries": 30, "avg_waste_kg_cap": 466.7, "avg_msw_kg_cap": 414.7, "min_waste": 124.9, "max_waste": 830.6}, {"year": 2017, "countries": 30, "avg_waste_kg_cap": 461.6, "avg_msw_kg_cap": 411.2, "min_waste": 127.6, "max_waste": 832.8}, {"year": 2018, "countries": 30, "avg_waste_kg_cap": 462.0, "avg_msw_kg_cap": 407.7, "min_waste": 125.4, "max_waste": 789.5}, {"year": 2019, "countries": 30, "avg_waste_kg_cap": 460.6, "avg_msw_kg_cap": 411.5, "min_waste": 123.5, "max_waste": 802.5}, {"year": 2020, "countries": 30, "avg_waste_kg_cap": 458.6, "avg_msw_kg_cap": 405.7, "min_waste": 121.3, "max_waste": 795.2}, {"year": 2021, "countries": 30, "avg_waste_kg_cap": 457.4, "avg_msw_kg_cap": 405.5, "min_waste": 126.7, "max_waste": 803.1}, {"year": 2022, "countries": 30, "avg_waste_kg_cap": 458.5, "avg_msw_kg_cap": 404.2, "min_waste": 124.2, "max_waste": 811.0}, {"year": 2023, "countries": 30, "avg_waste_kg_cap": 457.5, "avg_msw_kg_cap": 407.4, "min_waste": 124.6, "max_waste": 791.7}], "trends": {"DEU": {"year": [2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023], "total_waste_kg_cap": [616.44, 613.95, 613.08, 626.04, 637.06, 619.18, 598.83, 607.88, 613.05], "msw_kg_cap": [459.14, 445.95, 450.55, 435.84, 468.8, 454.65, 455.82, 455.36, 465.59], "e_waste_kg_cap": [19.71, 19.81, 20.07, 20.6, 22.81, 21.51, 21.82, 21.99, 22.22], "food_waste_kg_cap": [55.54, 57.39, 57.32, 57.45, 54.11, 56.4, 54.81, 55.55, 52.25], "recycling_rate": [64.5, 64.8, 65.6, 66.1, 65.3, 66.0, 65.5, 67.6, 66.4], "plastic_rate": [43.0, 43.5, 45.0, 43.4, 46.9, 45.7, 47.4, 47.0, 46.9], "paper_rate": [83.8, 83.9, 84.5, 83.0, 84.6, 83.9, 85.3, 85.7, 85.6], "glass_rate": [83.4, 83.6, 84.1, 84.4, 83.9, 83.5, 85.0, 84.2, 85.7]}, "USA": {"year": [2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023], "total_waste_kg_cap": [810.92, 830.58, 832.75, 786.01, 801.26, 795.24, 803.13, 811.0, 785.15], "msw_kg_cap": [754.53, 726.31, 731.64, 737.08, 741.4, 717.61, 733.25, 723.19, 745.75], "e_waste_kg_cap": [19.12, 19.34, 19.96, 19.43, 19.95, 20.79, 21.53, 21.21, 20.56], "food_waste_kg_cap": [99.23, 97.9, 95.17, 96.85, 95.0, 93.9, 94.32, 93.85, 94.8], "recycling_rate": [31.1, 31.1, 31.4, 31.0, 32.4, 31.9, 32.0, 32.5, 32.8], "plastic_rate": [8.5, 8.4, 8.6, 8.9, 8.8, 9.2, 9.1, 9.1, 9.0], "paper_rate": [65.8, 64.6, 64.6, 66.1, 65.2, 66.8, 66.2, 66.0, 66.0], "glass_rate": [30.4, 30.6, 31.1, 31.0, 31.5, 30.8, 31.3, 30.8, 31.3]}, "JPN": {"year": [2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023], "total_waste_kg_cap": [344.45, 331.5, 318.38, 332.9, 327.82, 329.12, 321.69, 333.31, 332.44], "msw_kg_cap": [333.05, 330.8, 345.6, 331.54, 330.03, 331.11, 345.91, 336.92, 342.52], "e_waste_kg_cap": [18.49, 19.7, 19.75, 19.9, 19.0, 21.03, 20.92, 21.07, 20.99], "food_waste_kg_cap": [52.7, 53.66, 50.85, 52.02, 51.93, 51.73, 50.38, 50.36, 51.1], "recycling_rate": [18.5, 19.5, 19.8, 19.5, 19.6, 19.5, 20.0, 19.9, 19.6], "plastic_rate": [18.6, 19.3, 19.3, 19.8, 19.5, 20.8, 19.7, 20.4, 20.8], "paper_rate": [76.5, 75.3, 76.6, 78.3, 77.8, 77.9, 77.7, 77.7, 78.2], "glass_rate": [72.3, 72.3, 72.2, 73.7, 72.4, 72.7, 72.0, 74.1, 74.8]}, "BRA": {"year": [2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023], "total_waste_kg_cap": [301.61, 299.34, 293.33, 292.17, 291.15, 285.69, 291.68, 288.26, 292.41], "msw_kg_cap": [261.09, 264.72, 253.67, 260.09, 257.12, 262.06, 261.85, 264.06, 252.77], "e_waste_kg_cap": [6.51, 6.41, 6.64, 6.83, 6.83, 7.07, 7.15, 7.37, 7.35], "food_waste_kg_cap": [62.6, 61.14, 61.94, 60.72, 59.38, 61.07, 57.65, 60.42, 57.72], "recycling_rate": [3.9, 4.0, 4.0, 4.0, 4.1, 4.0, 4.0, 4.0, 4.1], "plastic_rate": [4.6, 4.8, 5.0, 4.9, 4.8, 5.2, 5.0, 5.0, 5.2], "paper_rate": [44.2, 44.5, 45.2, 45.0, 45.1, 44.6, 45.0, 45.7, 44.9], "glass_rate": [46.5, 46.9, 46.5, 47.7, 47.5, 46.8, 47.6, 47.4, 47.4]}, "IND": {"year": [2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023], "total_waste_kg_cap": [138.92, 135.4, 134.77, 132.94, 129.07, 134.11, 129.14, 132.28, 135.83], "msw_kg_cap": [111.29, 109.48, 112.74, 108.22, 108.7, 105.68, 108.5, 110.67, 106.59], "e_waste_kg_cap": [2.22, 2.3, 2.28, 2.33, 2.4, 2.42, 2.42, 2.49, 2.51], "food_waste_kg_cap": [52.56, 50.16, 49.28, 49.43, 49.39, 49.92, 49.19, 50.22, 48.65], "recycling_rate": [14.2, 14.5, 14.9, 14.1, 14.5, 14.5, 14.7, 15.0, 15.1], "plastic_rate": [14.5, 14.3, 15.2, 14.6, 14.0, 15.1, 15.1, 15.4, 15.7], "paper_rate": [39.5, 39.9, 40.1, 39.9, 40.0, 39.8, 40.4, 40.3, 40.1], "glass_rate": [20.0, 19.9, 19.9, 19.9, 19.8, 20.0, 20.3, 20.4, 20.2]}, "KOR": {"year": [2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023], "total_waste_kg_cap": [388.54, 394.61, 384.85, 378.26, 376.93, 383.42, 384.04, 392.88, 368.7], "msw_kg_cap": [393.99, 397.27, 402.6, 398.38, 410.44, 404.37, 393.08, 390.62, 392.54], "e_waste_kg_cap": [13.78, 13.87, 14.45, 14.32, 14.88, 15.18, 14.86, 15.5, 16.11], "food_waste_kg_cap": [46.85, 46.86, 44.28, 44.49, 43.92, 46.55, 45.11, 44.84, 43.93], "recycling_rate": [56.8, 58.7, 59.0, 59.0, 58.3, 59.3, 57.7, 59.6, 60.1], "plastic_rate": [50.5, 50.8, 54.3, 54.6, 55.4, 53.3, 55.1, 56.0, 57.4], "paper_rate": [87.6, 88.6, 88.7, 89.6, 88.7, 90.3, 88.5, 87.2, 89.9], "glass_rate": [74.2, 75.8, 74.4, 75.8, 75.6, 74.9, 75.9, 74.9, 75.2]}, "AUS": {"year": [2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023], "total_waste_kg_cap": [718.63, 674.68, 663.33, 683.55, 670.4, 703.77, 668.49, 682.92, 648.25], "msw_kg_cap": [540.71, 557.79, 543.65, 526.28, 538.69, 531.37, 537.74, 514.05, 524.13], "e_waste_kg_cap": [19.71, 20.33, 20.53, 20.07, 21.3, 21.6, 22.38, 22.34, 23.43], "food_waste_kg_cap": [106.87, 104.47, 105.93, 105.1, 102.42, 103.26, 102.77, 100.44, 99.08], "recycling_rate": [36.3, 36.7, 36.4, 36.4, 37.2, 37.2, 37.5, 37.3, 37.6], "plastic_rate": [15.1, 15.1, 15.9, 15.9, 16.1, 16.8, 16.2, 16.6, 17.0], "paper_rate": [60.7, 61.1, 61.5, 61.4, 62.0, 62.1, 61.0, 62.7, 62.7], "glass_rate": [54.2, 55.0, 54.2, 53.8, 55.0, 55.4, 54.4, 55.0, 55.4]}, "ZAF": {"year": [2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023], "total_waste_kg_cap": [200.18, 203.7, 201.79, 196.24, 201.11, 195.98, 203.32, 197.94, 196.61], "msw_kg_cap": [189.51, 191.55, 185.9, 176.65, 191.55, 183.49, 184.18, 180.76, 185.87], "e_waste_kg_cap": [5.16, 5.14, 5.31, 5.17, 5.4, 5.54, 5.72, 5.57, 5.87], "food_waste_kg_cap": [68.49, 66.2, 66.58, 63.74, 66.53, 64.73, 65.01, 63.72, 63.19], "recycling_rate": [11.4, 11.5, 11.6, 11.4, 11.7, 11.7, 12.4, 12.0, 12.0], "plastic_rate": [13.1, 13.6, 13.6, 14.1, 13.8, 13.7, 14.7, 13.9, 14.7], "paper_rate": [56.7, 56.9, 56.8, 56.6, 58.5, 57.8, 58.2, 58.4, 58.5], "glass_rate": [21.7, 22.0, 22.1, 21.9, 21.9, 21.9, 22.0, 22.1, 22.3]}}, "mat_flows": [{"country_code": "ARE", "country": "UAE", "year": 2023, "material": "glass", "generated_kt": 395.0, "recycled_kt": 177.8, "landfilled_kt": 186.6, "incinerated_kt": 30.6, "composted_kt": 0.0, "recycle_pct": 45.0}, {"country_code": "ARE", "country": "UAE", "year": 2023, "material": "metal", "generated_kt": 228.2, "recycled_kt": 164.3, "landfilled_kt": 54.4, "incinerated_kt": 9.5, "composted_kt": 0.0, "recycle_pct": 72.0}, {"country_code": "ARE", "country": "UAE", "year": 2023, "material": "organic", "generated_kt": 1994.5, "recycled_kt": 199.5, "landfilled_kt": 894.3, "incinerated_kt": 343.7, "composted_kt": 557.0, "recycle_pct": 10.0}, {"country_code": "ARE", "country": "UAE", "year": 2023, "material": "other", "generated_kt": 1026.3, "recycled_kt": 41.1, "landfilled_kt": 840.8, "incinerated_kt": 144.4, "composted_kt": 0.0, "recycle_pct": 4.0}, {"country_code": "ARE", "country": "UAE", "year": 2023, "material": "paper", "generated_kt": 1399.2, "recycled_kt": 769.6, "landfilled_kt": 531.1, "incinerated_kt": 98.5, "composted_kt": 0.0, "recycle_pct": 55.0}, {"country_code": "ARE", "country": "UAE", "year": 2023, "material": "plastic", "generated_kt": 738.5, "recycled_kt": 110.8, "landfilled_kt": 532.6, "incinerated_kt": 95.1, "composted_kt": 0.0, "recycle_pct": 15.0}, {"country_code": "AUS", "country": "Australia", "year": 2023, "material": "glass", "generated_kt": 982.6, "recycled_kt": 540.4, "landfilled_kt": 381.9, "incinerated_kt": 60.3, "composted_kt": 0.0, "recycle_pct": 55.0}, {"country_code": "AUS", "country": "Australia", "year": 2023, "material": "metal", "generated_kt": 562.8, "recycled_kt": 394.0, "landfilled_kt": 143.1, "incinerated_kt": 25.7, "composted_kt": 0.0, "recycle_pct": 70.0}, {"country_code": "AUS", "country": "Australia", "year": 2023, "material": "organic", "generated_kt": 5025.9, "recycled_kt": 1759.1, "landfilled_kt": 1645.7, "incinerated_kt": 631.0, "composted_kt": 990.1, "recycle_pct": 35.0}, {"country_code": "AUS", "country": "Australia", "year": 2023, "material": "other", "generated_kt": 2315.9, "recycled_kt": 92.6, "landfilled_kt": 1860.6, "incinerated_kt": 362.7, "composted_kt": 0.0, "recycle_pct": 4.0}, {"country_code": "AUS", "country": "Australia", "year": 2023, "material": "paper", "generated_kt": 3340.9, "recycled_kt": 2071.4, "landfilled_kt": 1068.1, "incinerated_kt": 201.4, "composted_kt": 0.0, "recycle_pct": 62.0}, {"country_code": "AUS", "country": "Australia", "year": 2023, "material": "plastic", "generated_kt": 1741.1, "recycled_kt": 278.6, "landfilled_kt": 1253.5, "incinerated_kt": 209.0, "composted_kt": 0.0, "recycle_pct": 16.0}, {"country_code": "AUT", "country": "Austria", "year": 2023, "material": "glass", "generated_kt": 303.4, "recycled_kt": 257.9, "landfilled_kt": 38.7, "incinerated_kt": 6.8, "composted_kt": 0.0, "recycle_pct": 85.0}, {"country_code": "AUT", "country": "Austria", "year": 2023, "material": "metal", "generated_kt": 181.8, "recycled_kt": 163.6, "landfilled_kt": 15.5, "incinerated_kt": 2.7, "composted_kt": 0.0, "recycle_pct": 90.0}, {"country_code": "AUT", "country": "Austria", "year": 2023, "material": "organic", "generated_kt": 1564.0, "recycled_kt": 1110.4, "landfilled_kt": 230.9, "incinerated_kt": 94.5, "composted_kt": 128.2, "recycle_pct": 71.0}, {"country_code": "AUT", "country": "Austria", "year": 2023, "material": "other", "generated_kt": 779.1, "recycled_kt": 31.2, "landfilled_kt": 643.4, "incinerated_kt": 104.5, "composted_kt": 0.0, "recycle_pct": 4.0}, {"country_code": "AUT", "country": "Austria", "year": 2023, "material": "paper", "generated_kt": 1112.7, "recycled_kt": 890.2, "landfilled_kt": 192.3, "incinerated_kt": 30.2, "composted_kt": 0.0, "recycle_pct": 80.0}, {"country_code": "AUT", "country": "Austria", "year": 2023, "material": "plastic", "generated_kt": 523.3, "recycled_kt": 198.9, "landfilled_kt": 275.4, "incinerated_kt": 49.0, "composted_kt": 0.0, "recycle_pct": 38.0}, {"country_code": "BEL", "country": "Belgium", "year": 2023, "material": "glass", "generated_kt": 345.7, "recycled_kt": 273.1, "landfilled_kt": 60.9, "incinerated_kt": 11.7, "composted_kt": 0.0, "recycle_pct": 79.0}, {"country_code": "BEL", "country": "Belgium", "year": 2023, "material": "metal", "generated_kt": 198.2, "recycled_kt": 174.4, "landfilled_kt": 20.2, "incinerated_kt": 3.6, "composted_kt": 0.0, "recycle_pct": 88.0}, {"country_code": "BEL", "country": "Belgium", "year": 2023, "material": "organic", "generated_kt": 1707.1, "recycled_kt": 1126.7, "landfilled_kt": 273.5, "incinerated_kt": 116.9, "composted_kt": 190.0, "recycle_pct": 66.0}, {"country_code": "BEL", "country": "Belgium", "year": 2023, "material": "other", "generated_kt": 828.5, "recycled_kt": 33.1, "landfilled_kt": 671.1, "incinerated_kt": 124.3, "composted_kt": 0.0, "recycle_pct": 4.0}, {"country_code": "BEL", "country": "Belgium", "year": 2023, "material": "paper", "generated_kt": 1294.3, "recycled_kt": 996.6, "landfilled_kt": 256.1, "incinerated_kt": 41.6, "composted_kt": 0.0, "recycle_pct": 77.0}, {"country_code": "BEL", "country": "Belgium", "year": 2023, "material": "plastic", "generated_kt": 605.5, "recycled_kt": 242.2, "landfilled_kt": 309.1, "incinerated_kt": 54.2, "composted_kt": 0.0, "recycle_pct": 40.0}, {"country_code": "BRA", "country": "Brazil", "year": 2023, "material": "glass", "generated_kt": 4015.7, "recycled_kt": 1887.4, "landfilled_kt": 1792.2, "incinerated_kt": 336.1, "composted_kt": 0.0, "recycle_pct": 47.0}, {"country_code": "BRA", "country": "Brazil", "year": 2023, "material": "metal", "generated_kt": 2131.6, "recycled_kt": 1598.7, "landfilled_kt": 453.7, "incinerated_kt": 79.2, "composted_kt": 0.0, "recycle_pct": 75.0}, {"country_code": "BRA", "country": "Brazil", "year": 2023, "material": "organic", "generated_kt": 18993.7, "recycled_kt": 379.9, "landfilled_kt": 9771.2, "incinerated_kt": 3796.7, "composted_kt": 5045.9, "recycle_pct": 2.0}, {"country_code": "BRA", "country": "Brazil", "year": 2023, "material": "other", "generated_kt": 9412.7, "recycled_kt": 376.5, "landfilled_kt": 7729.8, "incinerated_kt": 1306.4, "composted_kt": 0.0, "recycle_pct": 4.0}, {"country_code": "BRA", "country": "Brazil", "year": 2023, "material": "paper", "generated_kt": 13599.4, "recycled_kt": 6119.7, "landfilled_kt": 6368.4, "incinerated_kt": 1111.3, "composted_kt": 0.0, "recycle_pct": 45.0}, {"country_code": "BRA", "country": "Brazil", "year": 2023, "material": "plastic", "generated_kt": 6630.4, "recycled_kt": 331.5, "landfilled_kt": 5265.9, "incinerated_kt": 1033.0, "composted_kt": 0.0, "recycle_pct": 5.0}, {"country_code": "CAN", "country": "Canada", "year": 2023, "material": "glass", "generated_kt": 1819.5, "recycled_kt": 727.8, "landfilled_kt": 933.1, "incinerated_kt": 158.6, "composted_kt": 0.0, "recycle_pct": 40.0}, {"country_code": "CAN", "country": "Canada", "year": 2023, "material": "metal", "generated_kt": 1075.7, "recycled_kt": 699.2, "landfilled_kt": 314.8, "incinerated_kt": 61.7, "composted_kt": 0.0, "recycle_pct": 65.0}, {"country_code": "CAN", "country": "Canada", "year": 2023, "material": "organic", "generated_kt": 9312.0, "recycled_kt": 1862.4, "landfilled_kt": 3762.3, "incinerated_kt": 1420.7, "composted_kt": 2266.6, "recycle_pct": 20.0}, {"country_code": "CAN", "country": "Canada", "year": 2023, "material": "other", "generated_kt": 4442.3, "recycled_kt": 177.7, "landfilled_kt": 3695.6, "incinerated_kt": 569.0, "composted_kt": 0.0, "recycle_pct": 4.0}, {"country_code": "CAN", "country": "Canada", "year": 2023, "material": "paper", "generated_kt": 6830.5, "recycled_kt": 4098.3, "landfilled_kt": 2321.0, "incinerated_kt": 411.2, "composted_kt": 0.0, "recycle_pct": 60.0}, {"country_code": "CAN", "country": "Canada", "year": 2023, "material": "plastic", "generated_kt": 3028.1, "recycled_kt": 333.1, "landfilled_kt": 2292.0, "incinerated_kt": 403.0, "composted_kt": 0.0, "recycle_pct": 11.0}, {"country_code": "CHE", "country": "Switzerland", "year": 2023, "material": "glass", "generated_kt": 377.6, "recycled_kt": 362.5, "landfilled_kt": 13.0, "incinerated_kt": 2.1, "composted_kt": 0.0, "recycle_pct": 96.0}, {"country_code": "CHE", "country": "Switzerland", "year": 2023, "material": "metal", "generated_kt": 209.1, "recycled_kt": 194.5, "landfilled_kt": 12.4, "incinerated_kt": 2.2, "composted_kt": 0.0, "recycle_pct": 93.0}, {"country_code": "CHE", "country": "Switzerland", "year": 2023, "material": "organic", "generated_kt": 1855.8, "recycled_kt": 1373.3, "landfilled_kt": 227.3, "incinerated_kt": 100.9, "composted_kt": 154.3, "recycle_pct": 74.0}, {"country_code": "CHE", "country": "Switzerland", "year": 2023, "material": "other", "generated_kt": 877.7, "recycled_kt": 35.1, "landfilled_kt": 716.0, "incinerated_kt": 126.6, "composted_kt": 0.0, "recycle_pct": 4.0}, {"country_code": "CHE", "country": "Switzerland", "year": 2023, "material": "paper", "generated_kt": 1318.2, "recycled_kt": 975.5, "landfilled_kt": 289.1, "incinerated_kt": 53.6, "composted_kt": 0.0, "recycle_pct": 74.0}, {"country_code": "CHE", "country": "Switzerland", "year": 2023, "material": "plastic", "generated_kt": 633.9, "recycled_kt": 202.8, "landfilled_kt": 365.0, "incinerated_kt": 66.1, "composted_kt": 0.0, "recycle_pct": 32.0}, {"country_code": "CHL", "country": "Chile", "year": 2023, "material": "glass", "generated_kt": 499.8, "recycled_kt": 209.9, "landfilled_kt": 248.8, "incinerated_kt": 41.1, "composted_kt": 0.0, "recycle_pct": 42.0}, {"country_code": "CHL", "country": "Chile", "year": 2023, "material": "metal", "generated_kt": 280.0, "recycled_kt": 190.4, "landfilled_kt": 76.2, "incinerated_kt": 13.4, "composted_kt": 0.0, "recycle_pct": 68.0}, {"country_code": "CHL", "country": "Chile", "year": 2023, "material": "organic", "generated_kt": 2488.4, "recycled_kt": 124.4, "landfilled_kt": 1222.7, "incinerated_kt": 446.6, "composted_kt": 694.7, "recycle_pct": 5.0}, {"country_code": "CHL", "country": "Chile", "year": 2023, "material": "other", "generated_kt": 1165.6, "recycled_kt": 46.6, "landfilled_kt": 935.5, "incinerated_kt": 183.5, "composted_kt": 0.0, "recycle_pct": 4.0}, {"country_code": "CHL", "country": "Chile", "year": 2023, "material": "paper", "generated_kt": 1849.7, "recycled_kt": 832.4, "landfilled_kt": 869.7, "incinerated_kt": 147.6, "composted_kt": 0.0, "recycle_pct": 45.0}, {"country_code": "CHL", "country": "Chile", "year": 2023, "material": "plastic", "generated_kt": 826.4, "recycled_kt": 82.6, "landfilled_kt": 627.1, "incinerated_kt": 116.7, "composted_kt": 0.0, "recycle_pct": 10.0}, {"country_code": "CHN", "country": "China", "year": 2023, "material": "glass", "generated_kt": 22089.6, "recycled_kt": 8835.8, "landfilled_kt": 11277.7, "incinerated_kt": 1976.1, "composted_kt": 0.0, "recycle_pct": 40.0}, {"country_code": "CHN", "country": "China", "year": 2023, "material": "metal", "generated_kt": 12261.0, "recycled_kt": 10544.5, "landfilled_kt": 1468.8, "incinerated_kt": 247.7, "composted_kt": 0.0, "recycle_pct": 86.0}, {"country_code": "CHN", "country": "China", "year": 2023, "material": "organic", "generated_kt": 107514.8, "recycled_kt": 16127.2, "landfilled_kt": 45665.4, "incinerated_kt": 18656.3, "composted_kt": 27065.9, "recycle_pct": 15.0}, {"country_code": "CHN", "country": "China", "year": 2023, "material": "other", "generated_kt": 53679.0, "recycled_kt": 2147.2, "landfilled_kt": 43919.3, "incinerated_kt": 7612.5, "composted_kt": 0.0, "recycle_pct": 4.0}, {"country_code": "CHN", "country": "China", "year": 2023, "material": "paper", "generated_kt": 82337.7, "recycled_kt": 42815.6, "landfilled_kt": 33708.0, "incinerated_kt": 5814.1, "composted_kt": 0.0, "recycle_pct": 52.0}, {"country_code": "CHN", "country": "China", "year": 2023, "material": "plastic", "generated_kt": 38057.4, "recycled_kt": 9133.8, "landfilled_kt": 24812.7, "incinerated_kt": 4110.9, "composted_kt": 0.0, "recycle_pct": 24.0}, {"country_code": "DEU", "country": "Germany", "year": 2023, "material": "glass", "generated_kt": 2555.9, "recycled_kt": 2147.0, "landfilled_kt": 348.1, "incinerated_kt": 60.8, "composted_kt": 0.0, "recycle_pct": 84.0}, {"country_code": "DEU", "country": "Germany", "year": 2023, "material": "metal", "generated_kt": 1528.4, "recycled_kt": 1390.8, "landfilled_kt": 116.1, "incinerated_kt": 21.5, "composted_kt": 0.0, "recycle_pct": 91.0}, {"country_code": "DEU", "country": "Germany", "year": 2023, "material": "organic", "generated_kt": 13154.1, "recycled_kt": 9471.0, "landfilled_kt": 1853.0, "incinerated_kt": 759.0, "composted_kt": 1071.1, "recycle_pct": 72.0}, {"country_code": "DEU", "country": "Germany", "year": 2023, "material": "other", "generated_kt": 6171.8, "recycled_kt": 246.9, "landfilled_kt": 5067.4, "incinerated_kt": 857.5, "composted_kt": 0.0, "recycle_pct": 4.0}, {"country_code": "DEU", "country": "Germany", "year": 2023, "material": "paper", "generated_kt": 9684.4, "recycled_kt": 8231.7, "landfilled_kt": 1228.1, "incinerated_kt": 224.6, "composted_kt": 0.0, "recycle_pct": 85.0}, {"country_code": "DEU", "country": "Germany", "year": 2023, "material": "plastic", "generated_kt": 4575.4, "recycled_kt": 2104.7, "landfilled_kt": 2095.1, "incinerated_kt": 375.6, "composted_kt": 0.0, "recycle_pct": 46.0}, {"country_code": "DNK", "country": "Denmark", "year": 2023, "material": "glass", "generated_kt": 264.2, "recycled_kt": 211.4, "landfilled_kt": 45.1, "incinerated_kt": 7.7, "composted_kt": 0.0, "recycle_pct": 80.0}, {"country_code": "DNK", "country": "Denmark", "year": 2023, "material": "metal", "generated_kt": 160.4, "recycled_kt": 141.2, "landfilled_kt": 16.4, "incinerated_kt": 2.8, "composted_kt": 0.0, "recycle_pct": 88.0}, {"country_code": "DNK", "country": "Denmark", "year": 2023, "material": "organic", "generated_kt": 1409.0, "recycled_kt": 775.0, "landfilled_kt": 317.2, "incinerated_kt": 128.9, "composted_kt": 187.9, "recycle_pct": 55.0}, {"country_code": "DNK", "country": "Denmark", "year": 2023, "material": "other", "generated_kt": 669.1, "recycled_kt": 26.8, "landfilled_kt": 553.7, "incinerated_kt": 88.6, "composted_kt": 0.0, "recycle_pct": 4.0}, {"country_code": "DNK", "country": "Denmark", "year": 2023, "material": "paper", "generated_kt": 1006.3, "recycled_kt": 734.6, "landfilled_kt": 230.5, "incinerated_kt": 41.2, "composted_kt": 0.0, "recycle_pct": 73.0}, {"country_code": "DNK", "country": "Denmark", "year": 2023, "material": "plastic", "generated_kt": 468.8, "recycled_kt": 164.1, "landfilled_kt": 261.8, "incinerated_kt": 42.9, "composted_kt": 0.0, "recycle_pct": 35.0}, {"country_code": "ESP", "country": "Spain", "year": 2023, "material": "glass", "generated_kt": 1369.3, "recycled_kt": 944.8, "landfilled_kt": 360.1, "incinerated_kt": 64.4, "composted_kt": 0.0, "recycle_pct": 69.0}, {"country_code": "ESP", "country": "Spain", "year": 2023, "material": "metal", "generated_kt": 806.6, "recycled_kt": 661.4, "landfilled_kt": 125.7, "incinerated_kt": 19.5, "composted_kt": 0.0, "recycle_pct": 82.0}, {"country_code": "ESP", "country": "Spain", "year": 2023, "material": "organic", "generated_kt": 6582.7, "recycled_kt": 2501.4, "landfilled_kt": 1990.8, "incinerated_kt": 751.4, "composted_kt": 1339.1, "recycle_pct": 38.0}, {"country_code": "ESP", "country": "Spain", "year": 2023, "material": "other", "generated_kt": 3598.8, "recycled_kt": 144.0, "landfilled_kt": 2902.3, "incinerated_kt": 552.5, "composted_kt": 0.0, "recycle_pct": 4.0}, {"country_code": "ESP", "country": "Spain", "year": 2023, "material": "paper", "generated_kt": 5068.4, "recycled_kt": 3193.1, "landfilled_kt": 1576.6, "incinerated_kt": 298.7, "composted_kt": 0.0, "recycle_pct": 63.0}, {"country_code": "ESP", "country": "Spain", "year": 2023, "material": "plastic", "generated_kt": 2399.5, "recycled_kt": 839.8, "landfilled_kt": 1304.6, "incinerated_kt": 255.1, "composted_kt": 0.0, "recycle_pct": 35.0}, {"country_code": "FIN", "country": "Finland", "year": 2023, "material": "glass", "generated_kt": 156.3, "recycled_kt": 109.4, "landfilled_kt": 39.5, "incinerated_kt": 7.4, "composted_kt": 0.0, "recycle_pct": 70.0}, {"country_code": "FIN", "country": "Finland", "year": 2023, "material": "metal", "generated_kt": 91.8, "recycled_kt": 78.0, "landfilled_kt": 11.6, "incinerated_kt": 2.2, "composted_kt": 0.0, "recycle_pct": 85.0}, {"country_code": "FIN", "country": "Finland", "year": 2023, "material": "organic", "generated_kt": 822.3, "recycled_kt": 394.7, "landfilled_kt": 212.8, "incinerated_kt": 87.0, "composted_kt": 127.8, "recycle_pct": 48.0}, {"country_code": "FIN", "country": "Finland", "year": 2023, "material": "other", "generated_kt": 406.8, "recycled_kt": 16.3, "landfilled_kt": 329.8, "incinerated_kt": 60.7, "composted_kt": 0.0, "recycle_pct": 4.0}, {"country_code": "FIN", "country": "Finland", "year": 2023, "material": "paper", "generated_kt": 595.9, "recycled_kt": 405.2, "landfilled_kt": 162.3, "incinerated_kt": 28.4, "composted_kt": 0.0, "recycle_pct": 68.0}, {"country_code": "FIN", "country": "Finland", "year": 2023, "material": "plastic", "generated_kt": 256.1, "recycled_kt": 71.7, "landfilled_kt": 155.4, "incinerated_kt": 29.0, "composted_kt": 0.0, "recycle_pct": 28.0}, {"country_code": "FRA", "country": "France", "year": 2023, "material": "glass", "generated_kt": 2455.6, "recycled_kt": 1792.6, "landfilled_kt": 559.1, "incinerated_kt": 103.9, "composted_kt": 0.0, "recycle_pct": 73.0}, {"country_code": "FRA", "country": "France", "year": 2023, "material": "metal", "generated_kt": 1367.2, "recycled_kt": 1189.5, "landfilled_kt": 150.6, "incinerated_kt": 27.1, "composted_kt": 0.0, "recycle_pct": 87.0}, {"country_code": "FRA", "country": "France", "year": 2023, "material": "organic", "generated_kt": 11585.6, "recycled_kt": 5792.8, "landfilled_kt": 2950.4, "incinerated_kt": 1102.6, "composted_kt": 1739.8, "recycle_pct": 50.0}, {"country_code": "FRA", "country": "France", "year": 2023, "material": "other", "generated_kt": 5276.0, "recycled_kt": 211.0, "landfilled_kt": 4310.4, "incinerated_kt": 754.6, "composted_kt": 0.0, "recycle_pct": 4.0}, {"country_code": "FRA", "country": "France", "year": 2023, "material": "paper", "generated_kt": 8603.9, "recycled_kt": 5678.6, "landfilled_kt": 2486.8, "incinerated_kt": 438.5, "composted_kt": 0.0, "recycle_pct": 66.0}, {"country_code": "FRA", "country": "France", "year": 2023, "material": "plastic", "generated_kt": 4049.5, "recycled_kt": 1093.4, "landfilled_kt": 2523.7, "incinerated_kt": 432.4, "composted_kt": 0.0, "recycle_pct": 27.0}, {"country_code": "GBR", "country": "United Kingdom", "year": 2023, "material": "glass", "generated_kt": 1990.9, "recycled_kt": 1353.8, "landfilled_kt": 535.7, "incinerated_kt": 101.4, "composted_kt": 0.0, "recycle_pct": 68.0}, {"country_code": "GBR", "country": "United Kingdom", "year": 2023, "material": "metal", "generated_kt": 1088.5, "recycled_kt": 936.1, "landfilled_kt": 130.0, "incinerated_kt": 22.4, "composted_kt": 0.0, "recycle_pct": 86.0}, {"country_code": "GBR", "country": "United Kingdom", "year": 2023, "material": "organic", "generated_kt": 10290.8, "recycled_kt": 4836.7, "landfilled_kt": 2808.2, "incinerated_kt": 1072.3, "composted_kt": 1573.6, "recycle_pct": 47.0}, {"country_code": "GBR", "country": "United Kingdom", "year": 2023, "material": "other", "generated_kt": 4708.8, "recycled_kt": 188.4, "landfilled_kt": 3824.8, "incinerated_kt": 695.6, "composted_kt": 0.0, "recycle_pct": 4.0}, {"country_code": "GBR", "country": "United Kingdom", "year": 2023, "material": "paper", "generated_kt": 6850.2, "recycled_kt": 4658.1, "landfilled_kt": 1875.5, "incinerated_kt": 316.6, "composted_kt": 0.0, "recycle_pct": 68.0}, {"country_code": "GBR", "country": "United Kingdom", "year": 2023, "material": "plastic", "generated_kt": 3400.7, "recycled_kt": 1054.2, "landfilled_kt": 2012.6, "incinerated_kt": 333.9, "composted_kt": 0.0, "recycle_pct": 31.0}, {"country_code": "IND", "country": "India", "year": 2023, "material": "glass", "generated_kt": 10244.6, "recycled_kt": 2048.9, "landfilled_kt": 7069.0, "incinerated_kt": 1126.7, "composted_kt": 0.0, "recycle_pct": 20.0}, {"country_code": "IND", "country": "India", "year": 2023, "material": "metal", "generated_kt": 6110.5, "recycled_kt": 3666.3, "landfilled_kt": 2068.8, "incinerated_kt": 375.4, "composted_kt": 0.0, "recycle_pct": 60.0}, {"country_code": "IND", "country": "India", "year": 2023, "material": "organic", "generated_kt": 54538.4, "recycled_kt": 5453.8, "landfilled_kt": 24253.0, "incinerated_kt": 10000.5, "composted_kt": 14831.1, "recycle_pct": 10.0}, {"country_code": "IND", "country": "India", "year": 2023, "material": "other", "generated_kt": 25049.5, "recycled_kt": 1002.0, "landfilled_kt": 20403.5, "incinerated_kt": 3644.0, "composted_kt": 0.0, "recycle_pct": 4.0}, {"country_code": "IND", "country": "India", "year": 2023, "material": "paper", "generated_kt": 38299.8, "recycled_kt": 15319.9, "landfilled_kt": 19307.5, "incinerated_kt": 3672.4, "composted_kt": 0.0, "recycle_pct": 40.0}, {"country_code": "IND", "country": "India", "year": 2023, "material": "plastic", "generated_kt": 18711.7, "recycled_kt": 2806.8, "landfilled_kt": 13412.4, "incinerated_kt": 2492.5, "composted_kt": 0.0, "recycle_pct": 15.0}, {"country_code": "ITA", "country": "Italy", "year": 2023, "material": "glass", "generated_kt": 1853.5, "recycled_kt": 1371.6, "landfilled_kt": 407.4, "incinerated_kt": 74.5, "composted_kt": 0.0, "recycle_pct": 74.0}, {"country_code": "ITA", "country": "Italy", "year": 2023, "material": "metal", "generated_kt": 1099.1, "recycled_kt": 934.2, "landfilled_kt": 141.3, "incinerated_kt": 23.6, "composted_kt": 0.0, "recycle_pct": 85.0}, {"country_code": "ITA", "country": "Italy", "year": 2023, "material": "organic", "generated_kt": 8989.8, "recycled_kt": 5573.7, "landfilled_kt": 1740.8, "incinerated_kt": 681.6, "composted_kt": 993.7, "recycle_pct": 62.0}, {"country_code": "ITA", "country": "Italy", "year": 2023, "material": "other", "generated_kt": 4362.8, "recycled_kt": 174.5, "landfilled_kt": 3544.5, "incinerated_kt": 643.8, "composted_kt": 0.0, "recycle_pct": 4.0}, {"country_code": "ITA", "country": "Italy", "year": 2023, "material": "paper", "generated_kt": 6726.4, "recycled_kt": 4843.0, "landfilled_kt": 1595.2, "incinerated_kt": 288.2, "composted_kt": 0.0, "recycle_pct": 72.0}, {"country_code": "ITA", "country": "Italy", "year": 2023, "material": "plastic", "generated_kt": 3129.6, "recycled_kt": 1314.4, "landfilled_kt": 1525.9, "incinerated_kt": 289.3, "composted_kt": 0.0, "recycle_pct": 42.0}, {"country_code": "JPN", "country": "Japan", "year": 2023, "material": "glass", "generated_kt": 2918.8, "recycled_kt": 2130.7, "landfilled_kt": 679.9, "incinerated_kt": 108.2, "composted_kt": 0.0, "recycle_pct": 73.0}, {"country_code": "JPN", "country": "Japan", "year": 2023, "material": "metal", "generated_kt": 1659.8, "recycled_kt": 1460.6, "landfilled_kt": 170.8, "incinerated_kt": 28.4, "composted_kt": 0.0, "recycle_pct": 88.0}, {"country_code": "JPN", "country": "Japan", "year": 2023, "material": "organic", "generated_kt": 14915.4, "recycled_kt": 1491.5, "landfilled_kt": 6631.2, "incinerated_kt": 2711.7, "composted_kt": 4081.0, "recycle_pct": 10.0}, {"country_code": "JPN", "country": "Japan", "year": 2023, "material": "other", "generated_kt": 6959.5, "recycled_kt": 278.4, "landfilled_kt": 5737.5, "incinerated_kt": 943.6, "composted_kt": 0.0, "recycle_pct": 4.0}, {"country_code": "JPN", "country": "Japan", "year": 2023, "material": "paper", "generated_kt": 9892.7, "recycled_kt": 7716.3, "landfilled_kt": 1833.0, "incinerated_kt": 343.4, "composted_kt": 0.0, "recycle_pct": 78.0}, {"country_code": "JPN", "country": "Japan", "year": 2023, "material": "plastic", "generated_kt": 5181.4, "recycled_kt": 1036.3, "landfilled_kt": 3510.7, "incinerated_kt": 634.4, "composted_kt": 0.0, "recycle_pct": 20.0}, {"country_code": "KEN", "country": "Kenya", "year": 2023, "material": "glass", "generated_kt": 451.0, "recycled_kt": 45.1, "landfilled_kt": 348.2, "incinerated_kt": 57.7, "composted_kt": 0.0, "recycle_pct": 10.0}, {"country_code": "KEN", "country": "Kenya", "year": 2023, "material": "metal", "generated_kt": 253.7, "recycled_kt": 101.5, "landfilled_kt": 129.1, "incinerated_kt": 23.1, "composted_kt": 0.0, "recycle_pct": 40.0}, {"country_code": "KEN", "country": "Kenya", "year": 2023, "material": "organic", "generated_kt": 2318.5, "recycled_kt": 115.9, "landfilled_kt": 1103.6, "incinerated_kt": 471.2, "composted_kt": 627.8, "recycle_pct": 5.0}, {"country_code": "KEN", "country": "Kenya", "year": 2023, "material": "other", "generated_kt": 1057.1, "recycled_kt": 42.3, "landfilled_kt": 857.3, "incinerated_kt": 157.5, "composted_kt": 0.0, "recycle_pct": 4.0}, {"country_code": "KEN", "country": "Kenya", "year": 2023, "material": "paper", "generated_kt": 1629.9, "recycled_kt": 489.0, "landfilled_kt": 971.5, "incinerated_kt": 169.4, "composted_kt": 0.0, "recycle_pct": 30.0}, {"country_code": "KEN", "country": "Kenya", "year": 2023, "material": "plastic", "generated_kt": 751.2, "recycled_kt": 60.1, "landfilled_kt": 582.3, "incinerated_kt": 108.8, "composted_kt": 0.0, "recycle_pct": 8.0}, {"country_code": "KOR", "country": "South Korea", "year": 2023, "material": "glass", "generated_kt": 1472.0, "recycled_kt": 1104.0, "landfilled_kt": 320.2, "incinerated_kt": 47.8, "composted_kt": 0.0, "recycle_pct": 75.0}, {"country_code": "KOR", "country": "South Korea", "year": 2023, "material": "metal", "generated_kt": 814.6, "recycled_kt": 733.1, "landfilled_kt": 68.6, "incinerated_kt": 12.9, "composted_kt": 0.0, "recycle_pct": 90.0}, {"country_code": "KOR", "country": "South Korea", "year": 2023, "material": "organic", "generated_kt": 6938.2, "recycled_kt": 4301.7, "landfilled_kt": 1286.8, "incinerated_kt": 580.0, "composted_kt": 769.7, "recycle_pct": 62.0}, {"country_code": "KOR", "country": "South Korea", "year": 2023, "material": "other", "generated_kt": 3359.2, "recycled_kt": 134.4, "landfilled_kt": 2769.2, "incinerated_kt": 455.6, "composted_kt": 0.0, "recycle_pct": 4.0}, {"country_code": "KOR", "country": "South Korea", "year": 2023, "material": "paper", "generated_kt": 5119.9, "recycled_kt": 4556.7, "landfilled_kt": 480.9, "incinerated_kt": 82.3, "composted_kt": 0.0, "recycle_pct": 89.0}, {"country_code": "KOR", "country": "South Korea", "year": 2023, "material": "plastic", "generated_kt": 2467.2, "recycled_kt": 1357.0, "landfilled_kt": 928.7, "incinerated_kt": 181.5, "composted_kt": 0.0, "recycle_pct": 55.0}, {"country_code": "MEX", "country": "Mexico", "year": 2023, "material": "glass", "generated_kt": 2986.3, "recycled_kt": 1045.2, "landfilled_kt": 1666.1, "incinerated_kt": 275.0, "composted_kt": 0.0, "recycle_pct": 35.0}, {"country_code": "MEX", "country": "Mexico", "year": 2023, "material": "metal", "generated_kt": 1683.2, "recycled_kt": 1094.1, "landfilled_kt": 503.3, "incinerated_kt": 85.8, "composted_kt": 0.0, "recycle_pct": 65.0}, {"country_code": "MEX", "country": "Mexico", "year": 2023, "material": "organic", "generated_kt": 14930.9, "recycled_kt": 447.9, "landfilled_kt": 7363.5, "incinerated_kt": 2741.4, "composted_kt": 4378.1, "recycle_pct": 3.0}, {"country_code": "MEX", "country": "Mexico", "year": 2023, "material": "other", "generated_kt": 6985.7, "recycled_kt": 279.4, "landfilled_kt": 5672.9, "incinerated_kt": 1033.4, "composted_kt": 0.0, "recycle_pct": 4.0}, {"country_code": "MEX", "country": "Mexico", "year": 2023, "material": "paper", "generated_kt": 10915.8, "recycled_kt": 3274.7, "landfilled_kt": 6428.0, "incinerated_kt": 1213.1, "composted_kt": 0.0, "recycle_pct": 30.0}, {"country_code": "MEX", "country": "Mexico", "year": 2023, "material": "plastic", "generated_kt": 5094.4, "recycled_kt": 305.7, "landfilled_kt": 4099.7, "incinerated_kt": 689.0, "composted_kt": 0.0, "recycle_pct": 6.0}, {"country_code": "NGA", "country": "Nigeria", "year": 2023, "material": "glass", "generated_kt": 2716.7, "recycled_kt": 135.8, "landfilled_kt": 2190.8, "incinerated_kt": 390.1, "composted_kt": 0.0, "recycle_pct": 5.0}, {"country_code": "NGA", "country": "Nigeria", "year": 2023, "material": "metal", "generated_kt": 1613.5, "recycled_kt": 726.1, "landfilled_kt": 753.5, "incinerated_kt": 133.9, "composted_kt": 0.0, "recycle_pct": 45.0}, {"country_code": "NGA", "country": "Nigeria", "year": 2023, "material": "organic", "generated_kt": 13373.3, "recycled_kt": 267.5, "landfilled_kt": 6805.5, "incinerated_kt": 2607.0, "composted_kt": 3693.3, "recycle_pct": 2.0}, {"country_code": "NGA", "country": "Nigeria", "year": 2023, "material": "other", "generated_kt": 6649.8, "recycled_kt": 266.0, "landfilled_kt": 5424.5, "incinerated_kt": 959.3, "composted_kt": 0.0, "recycle_pct": 4.0}, {"country_code": "NGA", "country": "Nigeria", "year": 2023, "material": "paper", "generated_kt": 9799.3, "recycled_kt": 1959.9, "landfilled_kt": 6710.4, "incinerated_kt": 1129.0, "composted_kt": 0.0, "recycle_pct": 20.0}, {"country_code": "NGA", "country": "Nigeria", "year": 2023, "material": "plastic", "generated_kt": 4637.3, "recycled_kt": 139.1, "landfilled_kt": 3899.6, "incinerated_kt": 598.6, "composted_kt": 0.0, "recycle_pct": 3.0}, {"country_code": "NLD", "country": "Netherlands", "year": 2023, "material": "glass", "generated_kt": 593.5, "recycled_kt": 451.1, "landfilled_kt": 120.6, "incinerated_kt": 21.8, "composted_kt": 0.0, "recycle_pct": 76.0}, {"country_code": "NLD", "country": "Netherlands", "year": 2023, "material": "metal", "generated_kt": 315.2, "recycled_kt": 280.5, "landfilled_kt": 29.9, "incinerated_kt": 4.8, "composted_kt": 0.0, "recycle_pct": 89.0}, {"country_code": "NLD", "country": "Netherlands", "year": 2023, "material": "organic", "generated_kt": 2871.5, "recycled_kt": 1866.5, "landfilled_kt": 498.1, "incinerated_kt": 205.3, "composted_kt": 301.6, "recycle_pct": 65.0}, {"country_code": "NLD", "country": "Netherlands", "year": 2023, "material": "other", "generated_kt": 1452.5, "recycled_kt": 58.1, "landfilled_kt": 1182.2, "incinerated_kt": 212.2, "composted_kt": 0.0, "recycle_pct": 4.0}, {"country_code": "NLD", "country": "Netherlands", "year": 2023, "material": "paper", "generated_kt": 2108.8, "recycled_kt": 1666.0, "landfilled_kt": 372.1, "incinerated_kt": 70.7, "composted_kt": 0.0, "recycle_pct": 79.0}, {"country_code": "NLD", "country": "Netherlands", "year": 2023, "material": "plastic", "generated_kt": 1013.4, "recycled_kt": 415.5, "landfilled_kt": 509.4, "incinerated_kt": 88.5, "composted_kt": 0.0, "recycle_pct": 41.0}, {"country_code": "NOR", "country": "Norway", "year": 2023, "material": "glass", "generated_kt": 137.3, "recycled_kt": 101.6, "landfilled_kt": 30.3, "incinerated_kt": 5.4, "composted_kt": 0.0, "recycle_pct": 74.0}, {"country_code": "NOR", "country": "Norway", "year": 2023, "material": "metal", "generated_kt": 76.8, "recycled_kt": 66.0, "landfilled_kt": 9.3, "incinerated_kt": 1.5, "composted_kt": 0.0, "recycle_pct": 85.9}, {"country_code": "NOR", "country": "Norway", "year": 2023, "material": "organic", "generated_kt": 691.4, "recycled_kt": 352.6, "landfilled_kt": 175.6, "incinerated_kt": 67.7, "composted_kt": 95.5, "recycle_pct": 51.0}, {"country_code": "NOR", "country": "Norway", "year": 2023, "material": "other", "generated_kt": 333.3, "recycled_kt": 13.3, "landfilled_kt": 270.9, "incinerated_kt": 49.1, "composted_kt": 0.0, "recycle_pct": 4.0}, {"country_code": "NOR", "country": "Norway", "year": 2023, "material": "paper", "generated_kt": 495.8, "recycled_kt": 371.9, "landfilled_kt": 106.4, "incinerated_kt": 17.5, "composted_kt": 0.0, "recycle_pct": 75.0}, {"country_code": "NOR", "country": "Norway", "year": 2023, "material": "plastic", "generated_kt": 245.1, "recycled_kt": 78.4, "landfilled_kt": 140.9, "incinerated_kt": 25.8, "composted_kt": 0.0, "recycle_pct": 32.0}, {"country_code": "NZL", "country": "New Zealand", "year": 2023, "material": "glass", "generated_kt": 242.9, "recycled_kt": 121.5, "landfilled_kt": 103.8, "incinerated_kt": 17.6, "composted_kt": 0.0, "recycle_pct": 50.0}, {"country_code": "NZL", "country": "New Zealand", "year": 2023, "material": "metal", "generated_kt": 138.0, "recycled_kt": 85.6, "landfilled_kt": 44.8, "incinerated_kt": 7.6, "composted_kt": 0.0, "recycle_pct": 62.0}, {"country_code": "NZL", "country": "New Zealand", "year": 2023, "material": "organic", "generated_kt": 1238.9, "recycled_kt": 272.6, "landfilled_kt": 461.5, "incinerated_kt": 197.9, "composted_kt": 306.9, "recycle_pct": 22.0}, {"country_code": "NZL", "country": "New Zealand", "year": 2023, "material": "other", "generated_kt": 589.3, "recycled_kt": 23.6, "landfilled_kt": 483.5, "incinerated_kt": 82.2, "composted_kt": 0.0, "recycle_pct": 4.0}, {"country_code": "NZL", "country": "New Zealand", "year": 2023, "material": "paper", "generated_kt": 853.6, "recycled_kt": 512.2, "landfilled_kt": 290.5, "incinerated_kt": 50.9, "composted_kt": 0.0, "recycle_pct": 60.0}, {"country_code": "NZL", "country": "New Zealand", "year": 2023, "material": "plastic", "generated_kt": 412.7, "recycled_kt": 37.1, "landfilled_kt": 323.0, "incinerated_kt": 52.6, "composted_kt": 0.0, "recycle_pct": 9.0}, {"country_code": "POL", "country": "Poland", "year": 2023, "material": "glass", "generated_kt": 795.3, "recycled_kt": 469.2, "landfilled_kt": 276.7, "incinerated_kt": 49.4, "composted_kt": 0.0, "recycle_pct": 59.0}, {"country_code": "POL", "country": "Poland", "year": 2023, "material": "metal", "generated_kt": 459.4, "recycled_kt": 358.3, "landfilled_kt": 84.2, "incinerated_kt": 16.9, "composted_kt": 0.0, "recycle_pct": 78.0}, {"country_code": "POL", "country": "Poland", "year": 2023, "material": "organic", "generated_kt": 4138.4, "recycled_kt": 1241.5, "landfilled_kt": 1404.7, "incinerated_kt": 572.2, "composted_kt": 920.0, "recycle_pct": 30.0}, {"country_code": "POL", "country": "Poland", "year": 2023, "material": "other", "generated_kt": 2000.2, "recycled_kt": 80.0, "landfilled_kt": 1628.9, "incinerated_kt": 291.3, "composted_kt": 0.0, "recycle_pct": 4.0}, {"country_code": "POL", "country": "Poland", "year": 2023, "material": "paper", "generated_kt": 2885.4, "recycled_kt": 1615.8, "landfilled_kt": 1066.9, "incinerated_kt": 202.7, "composted_kt": 0.0, "recycle_pct": 56.0}, {"country_code": "POL", "country": "Poland", "year": 2023, "material": "plastic", "generated_kt": 1328.3, "recycled_kt": 411.8, "landfilled_kt": 783.2, "incinerated_kt": 133.3, "composted_kt": 0.0, "recycle_pct": 31.0}, {"country_code": "SGP", "country": "Singapore", "year": 2023, "material": "glass", "generated_kt": 57.3, "recycled_kt": 7.4, "landfilled_kt": 42.3, "incinerated_kt": 7.6, "composted_kt": 0.0, "recycle_pct": 12.9}, {"country_code": "SGP", "country": "Singapore", "year": 2023, "material": "metal", "generated_kt": 31.8, "recycled_kt": 31.2, "landfilled_kt": 0.5, "incinerated_kt": 0.1, "composted_kt": 0.0, "recycle_pct": 98.1}, {"country_code": "SGP", "country": "Singapore", "year": 2023, "material": "organic", "generated_kt": 269.9, "recycled_kt": 48.6, "landfilled_kt": 117.2, "incinerated_kt": 39.8, "composted_kt": 64.3, "recycle_pct": 18.0}, {"country_code": "SGP", "country": "Singapore", "year": 2023, "material": "other", "generated_kt": 134.3, "recycled_kt": 5.4, "landfilled_kt": 111.0, "incinerated_kt": 17.9, "composted_kt": 0.0, "recycle_pct": 4.0}, {"country_code": "SGP", "country": "Singapore", "year": 2023, "material": "paper", "generated_kt": 202.7, "recycled_kt": 99.3, "landfilled_kt": 87.8, "incinerated_kt": 15.6, "composted_kt": 0.0, "recycle_pct": 49.0}, {"country_code": "SGP", "country": "Singapore", "year": 2023, "material": "plastic", "generated_kt": 96.4, "recycled_kt": 3.9, "landfilled_kt": 78.8, "incinerated_kt": 13.7, "composted_kt": 0.0, "recycle_pct": 4.0}, {"country_code": "SWE", "country": "Sweden", "year": 2023, "material": "glass", "generated_kt": 277.3, "recycled_kt": 196.9, "landfilled_kt": 69.2, "incinerated_kt": 11.2, "composted_kt": 0.0, "recycle_pct": 71.0}, {"country_code": "SWE", "country": "Sweden", "year": 2023, "material": "metal", "generated_kt": 173.3, "recycled_kt": 149.0, "landfilled_kt": 20.9, "incinerated_kt": 3.4, "composted_kt": 0.0, "recycle_pct": 86.0}, {"country_code": "SWE", "country": "Sweden", "year": 2023, "material": "organic", "generated_kt": 1414.6, "recycled_kt": 961.9, "landfilled_kt": 211.4, "incinerated_kt": 92.1, "composted_kt": 149.2, "recycle_pct": 68.0}, {"country_code": "SWE", "country": "Sweden", "year": 2023, "material": "other", "generated_kt": 707.4, "recycled_kt": 28.3, "landfilled_kt": 574.9, "incinerated_kt": 104.2, "composted_kt": 0.0, "recycle_pct": 4.0}, {"country_code": "SWE", "country": "Sweden", "year": 2023, "material": "paper", "generated_kt": 1033.3, "recycled_kt": 785.3, "landfilled_kt": 210.1, "incinerated_kt": 37.9, "composted_kt": 0.0, "recycle_pct": 76.0}, {"country_code": "SWE", "country": "Sweden", "year": 2023, "material": "plastic", "generated_kt": 496.2, "recycled_kt": 178.6, "landfilled_kt": 274.0, "incinerated_kt": 43.6, "composted_kt": 0.0, "recycle_pct": 36.0}, {"country_code": "USA", "country": "United States", "year": 2023, "material": "glass", "generated_kt": 16671.6, "recycled_kt": 5168.2, "landfilled_kt": 9781.4, "incinerated_kt": 1722.0, "composted_kt": 0.0, "recycle_pct": 31.0}, {"country_code": "USA", "country": "United States", "year": 2023, "material": "metal", "generated_kt": 9888.9, "recycled_kt": 6625.6, "landfilled_kt": 2788.7, "incinerated_kt": 474.6, "composted_kt": 0.0, "recycle_pct": 67.0}, {"country_code": "USA", "country": "United States", "year": 2023, "material": "organic", "generated_kt": 83703.3, "recycled_kt": 20088.8, "landfilled_kt": 31248.5, "incinerated_kt": 13259.5, "composted_kt": 19106.5, "recycle_pct": 24.0}, {"country_code": "USA", "country": "United States", "year": 2023, "material": "other", "generated_kt": 40362.1, "recycled_kt": 1614.5, "landfilled_kt": 32773.5, "incinerated_kt": 5974.1, "composted_kt": 0.0, "recycle_pct": 4.0}, {"country_code": "USA", "country": "United States", "year": 2023, "material": "paper", "generated_kt": 64328.5, "recycled_kt": 42456.8, "landfilled_kt": 18849.2, "incinerated_kt": 3022.5, "composted_kt": 0.0, "recycle_pct": 66.0}, {"country_code": "USA", "country": "United States", "year": 2023, "material": "plastic", "generated_kt": 29031.6, "recycled_kt": 2612.8, "landfilled_kt": 22470.2, "incinerated_kt": 3948.6, "composted_kt": 0.0, "recycle_pct": 9.0}, {"country_code": "ZAF", "country": "South Africa", "year": 2023, "material": "glass", "generated_kt": 715.9, "recycled_kt": 157.5, "landfilled_kt": 477.2, "incinerated_kt": 81.2, "composted_kt": 0.0, "recycle_pct": 22.0}, {"country_code": "ZAF", "country": "South Africa", "year": 2023, "material": "metal", "generated_kt": 443.7, "recycled_kt": 297.3, "landfilled_kt": 123.8, "incinerated_kt": 22.6, "composted_kt": 0.0, "recycle_pct": 67.0}, {"country_code": "ZAF", "country": "South Africa", "year": 2023, "material": "organic", "generated_kt": 3751.1, "recycled_kt": 187.6, "landfilled_kt": 1806.9, "incinerated_kt": 674.1, "composted_kt": 1082.5, "recycle_pct": 5.0}, {"country_code": "ZAF", "country": "South Africa", "year": 2023, "material": "other", "generated_kt": 1915.7, "recycled_kt": 76.6, "landfilled_kt": 1557.3, "incinerated_kt": 281.8, "composted_kt": 0.0, "recycle_pct": 4.0}, {"country_code": "ZAF", "country": "South Africa", "year": 2023, "material": "paper", "generated_kt": 2596.6, "recycled_kt": 1506.0, "landfilled_kt": 945.1, "incinerated_kt": 145.5, "composted_kt": 0.0, "recycle_pct": 58.0}, {"country_code": "ZAF", "country": "South Africa", "year": 2023, "material": "plastic", "generated_kt": 1306.1, "recycled_kt": 182.9, "landfilled_kt": 938.5, "incinerated_kt": 184.7, "composted_kt": 0.0, "recycle_pct": 14.0}], "country_names": {"AUS": "Australia", "AUT": "Austria", "BEL": "Belgium", "BRA": "Brazil", "CAN": "Canada", "CHL": "Chile", "CHN": "China", "DNK": "Denmark", "FIN": "Finland", "FRA": "France", "DEU": "Germany", "IND": "India", "ITA": "Italy", "JPN": "Japan", "KEN": "Kenya", "MEX": "Mexico", "NLD": "Netherlands", "NZL": "New Zealand", "NGA": "Nigeria", "NOR": "Norway", "POL": "Poland", "SGP": "Singapore", "ZAF": "South Africa", "KOR": "South Korea", "ESP": "Spain", "SWE": "Sweden", "CHE": "Switzerland", "ARE": "UAE", "GBR": "United Kingdom", "USA": "United States"}};
+
+// ══════════════════════════════════════════════════════════
+//  COLOURS
+// ══════════════════════════════════════════════════════════
+const C = {
+  green1:  '#00ff87',
+  green2:  '#00c96d',
+  green3:  '#00945a',
+  danger:  '#ff4d6d',
+  warn:    '#ffb347',
+  muted:   '#4a6b60',
+  text:    '#e8f5f0',
+  textsec: '#8ab8a8',
+  bg:      '#0b0f0e',
+  card:    '#111815',
+  border:  '#1e2b27',
+};
+const REGION_C = {
+  'Europe':       C.green1,
+  'Americas':     '#4ecdc4',
+  'Asia-Pacific': '#45b7d1',
+  'Africa':       C.warn,
+  'Middle East':  '#dda0dd',
+};
+const MAT_C = {
+  plastic:  '#4ecdc4',
+  paper:    '#45b7d1',
+  glass:    '#96ceb4',
+  metal:    '#dda0dd',
+  organic:  '#98d8c8',
+  other:    '#778899',
+};
+
+const CHART_DEFAULTS = {
+  color:  C.textsec,
+  font:   { family: "'JetBrains Mono', monospace", size: 11 },
+};
+
+Chart.defaults.color  = C.textsec;
+Chart.defaults.font.family = "'JetBrains Mono', monospace";
+Chart.defaults.font.size   = 11;
+
+function gridOpts() {
+  return { color: C.border, borderColor: C.border };
+}
+function darkPlugin() {
+  return {
+    id: 'darkBg',
+    beforeDraw(chart) {
+      const ctx = chart.ctx;
+      ctx.save();
+      ctx.fillStyle = C.card;
+      ctx.fillRect(0, 0, chart.width, chart.height);
+      ctx.restore();
+    }
+  };
+}
+
+// ══════════════════════════════════════════════════════════
+//  TAB NAVIGATION
+// ══════════════════════════════════════════════════════════
+let activeCharts = {};
+function showTab(name) {
+  document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  event.target.classList.add('active');
+  renderTab(name);
+}
+
+function renderTab(name) {
+  if (name === 'overview')    renderOverview();
+  if (name === 'leaderboard') renderLeaderboard();
+  if (name === 'trends')      initTrends();
+  if (name === 'materials')   initMaterials();
+  if (name === 'heatmap')     renderHeatmap();
+  if (name === 'analytics')   renderAnalytics();
+}
+
+function destroyChart(id) {
+  if (activeCharts[id]) { activeCharts[id].destroy(); delete activeCharts[id]; }
+}
+
+// ══════════════════════════════════════════════════════════
+//  OVERVIEW
+// ══════════════════════════════════════════════════════════
+let overviewDone = false;
+function renderOverview() {
+  if (overviewDone) return;
+  overviewDone = true;
+
+  // Region radar
+  const regions = [...new Set(DATA.leaderboard.map(d => d.region))];
+  const radarMats = ['overall_rate','plastic_rate','paper_rate','glass_rate','metal_rate','organic_rate'];
+  const radarLabels = ['Overall','Plastic','Paper','Glass','Metal','Organic'];
+  const radarDatasets = regions.map(r => {
+    const rows = DATA.leaderboard.filter(d => d.region === r);
+    return {
+      label: r,
+      data: radarMats.map(m => {
+        const vals = rows.map(d => d[m] || 0).filter(v => v > 0);
+        return vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : 0;
+      }),
+      borderColor: REGION_C[r] || C.muted,
+      backgroundColor: (REGION_C[r] || C.muted) + '22',
+      borderWidth: 2, pointRadius: 3,
+    };
+  });
+  destroyChart('regionRadar');
+  activeCharts['regionRadar'] = new Chart(document.getElementById('regionRadar'), {
+    type: 'radar',
+    data: { labels: radarLabels, datasets: radarDatasets },
+    options: {
+      plugins: { legend: { labels: { color: C.textsec } } },
+      scales: { r: { backgroundColor: C.bg, grid: { color: C.border },
+        angleLines: { color: C.border }, ticks: { color: C.textsec, backdropColor: 'transparent' },
+        suggestedMin: 0, suggestedMax: 100 } },
+    },
+    plugins: [darkPlugin()],
+  });
+
+  // Donut
+  const regionCounts = {};
+  DATA.countries.forEach(d => { regionCounts[d.region] = (regionCounts[d.region]||0)+1; });
+  destroyChart('regionDonut');
+  activeCharts['regionDonut'] = new Chart(document.getElementById('regionDonut'), {
+    type: 'doughnut',
+    data: {
+      labels: Object.keys(regionCounts),
+      datasets: [{ data: Object.values(regionCounts),
+        backgroundColor: Object.keys(regionCounts).map(r => REGION_C[r]||C.muted),
+        borderColor: C.bg, borderWidth: 2,
+      }],
+    },
+    options: { cutout: '62%', plugins: { legend: { position: 'bottom', labels: { color: C.textsec, padding: 12 } } } },
+    plugins: [darkPlugin()],
+  });
+
+  // Material bar
+  const mats = DATA.mat_global;
+  destroyChart('materialBar');
+  activeCharts['materialBar'] = new Chart(document.getElementById('materialBar'), {
+    type: 'bar',
+    data: {
+      labels: mats.map(m => m.material.charAt(0).toUpperCase()+m.material.slice(1)),
+      datasets: [
+        { label: 'Generated (kt)',  data: mats.map(m=>m.total_generated_kt),
+           backgroundColor: mats.map(m=>(MAT_C[m.material]||C.muted)+'44') },
+        { label: 'Recycled (kt)',   data: mats.map(m=>m.total_recycled_kt),
+           backgroundColor: mats.map(m=> MAT_C[m.material]||C.muted) },
+      ],
+    },
+    options: {
+      scales: { x: { grid: gridOpts() }, y: { grid: gridOpts() } },
+      plugins: { legend: { labels: { color: C.textsec } } },
+    },
+    plugins: [darkPlugin()],
+  });
+
+  // Improvers table
+  const tbody = document.getElementById('improvers-body');
+  DATA.top_improvers.forEach((d,i) => {
+    const pct = Math.min(100, (d.improvement / 20) * 100);
+    tbody.innerHTML += `<tr>
+      <td><span class="rank rank-${i+1}">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</span></td>
+      <td>${d.country}</td>
+      <td><span class="badge badge-muted">${d.region}</span></td>
+      <td>${d.start_rate.toFixed(1)}%</td>
+      <td style="color:var(--green2)">${d.end_rate.toFixed(1)}%</td>
+      <td><span class="badge badge-green">+${d.improvement.toFixed(1)}pp</span></td>
+      <td style="width:120px">
+        <div class="pbar-wrap"><div class="pbar" style="width:${pct}%"></div></div>
+      </td>
+    </tr>`;
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+//  LEADERBOARD
+// ══════════════════════════════════════════════════════════
+function initLeaderboard() {
+  const years = [...new Set(DATA.leaderboard.map(d=>d.year))].sort((a,b)=>b-a);
+  const sel = document.getElementById('lb-year-sel');
+  years.forEach(y => {
+    const opt = document.createElement('option');
+    opt.value = y; opt.text = y;
+    sel.appendChild(opt);
+  });
+  updateLeaderboard();
+}
+
+function updateLeaderboard() {
+  const yr = +document.getElementById('lb-year-sel').value;
+  const rows = DATA.leaderboard.filter(d => d.year === yr).sort((a,b) => b.overall_rate - a.overall_rate);
+
+  // Table
+  const tbody = document.getElementById('lb-body');
+  tbody.innerHTML = '';
+  rows.forEach((d,i) => {
+    const grade = d.overall_rate >= 50 ? 'badge-green' : d.overall_rate >= 25 ? 'badge-warn' : 'badge-muted';
+    tbody.innerHTML += `<tr>
+      <td><span class="rank rank-${i+1}">${i<3?['🥇','🥈','🥉'][i]:i+1}</span></td>
+      <td>${d.country}</td>
+      <td><span class="badge badge-muted">${d.region}</span></td>
+      <td><span class="badge ${grade}">${(d.overall_rate||0).toFixed(1)}%</span></td>
+      <td>${(d.plastic_rate||0).toFixed(1)}%</td>
+      <td>${(d.paper_rate||0).toFixed(1)}%</td>
+      <td>${(d.glass_rate||0).toFixed(1)}%</td>
+      <td>${(d.metal_rate||0).toFixed(1)}%</td>
+      <td>${(d.organic_rate||0).toFixed(1)}%</td>
+    </tr>`;
+  });
+
+  // Chart
+  destroyChart('lb-chart');
+  const top25 = rows.slice(0, 25).reverse();
+  activeCharts['lb-chart'] = new Chart(document.getElementById('lb-chart'), {
+    type: 'bar',
+    data: {
+      labels: top25.map(d => d.country),
+      datasets: [{ label: 'Recycling Rate (%)',
+        data: top25.map(d => d.overall_rate),
+        backgroundColor: top25.map(d => (REGION_C[d.region]||C.muted)+'cc'),
+        borderColor:     top25.map(d =>  REGION_C[d.region]||C.muted),
+        borderWidth: 1,
+        borderRadius: 3,
+      }],
+    },
+    options: {
+      indexAxis: 'y',
+      scales: {
+        x: { grid: gridOpts(), max: 100, ticks: { callback: v => v+'%' } },
+        y: { grid: gridOpts() },
+      },
+      plugins: { legend: { display: false } },
+    },
+    plugins: [darkPlugin()],
+  });
+}
+
+function renderLeaderboard() {
+  const sel = document.getElementById('lb-year-sel');
+  if (!sel.options.length) initLeaderboard();
+}
+
+// ══════════════════════════════════════════════════════════
+//  TRENDS
+// ══════════════════════════════════════════════════════════
+function initTrends() {
+  const sel = document.getElementById('trend-sel');
+  if (!sel.options.length) {
+    Object.keys(DATA.trends).forEach(code => {
+      const opt = document.createElement('option');
+      opt.value = code;
+      opt.text = (DATA.country_names[code] || code) + ' (' + code + ')';
+      sel.appendChild(opt);
+    });
+  }
+  updateTrend();
+}
+
+function updateTrend() {
+  const code = document.getElementById('trend-sel').value;
+  const d = DATA.trends[code];
+  if (!d) return;
+  const years = d.year;
+
+  destroyChart('trendWaste');
+  activeCharts['trendWaste'] = new Chart(document.getElementById('trendWaste'), {
+    type: 'line',
+    data: {
+      labels: years,
+      datasets: [
+        { label: 'Total Waste',  data: d.total_waste_kg_cap, borderColor: C.green1, backgroundColor: C.green1+'18', fill: false, tension: 0.3, pointRadius: 3 },
+        { label: 'MSW',         data: d.msw_kg_cap,          borderColor: C.green2, backgroundColor: 'transparent', fill: false, tension: 0.3, pointRadius: 3, borderDash: [4,2] },
+        { label: 'E-Waste',     data: d.e_waste_kg_cap,      borderColor: C.danger, backgroundColor: 'transparent', fill: false, tension: 0.3, pointRadius: 3 },
+        { label: 'Food Waste',  data: d.food_waste_kg_cap,   borderColor: C.warn,   backgroundColor: 'transparent', fill: false, tension: 0.3, pointRadius: 3, borderDash: [2,2] },
+      ],
+    },
+    options: {
+      scales: { x: { grid: gridOpts() }, y: { grid: gridOpts() } },
+      plugins: { legend: { labels: { color: C.textsec } } },
+    },
+    plugins: [darkPlugin()],
+  });
+
+  destroyChart('trendRecycle');
+  activeCharts['trendRecycle'] = new Chart(document.getElementById('trendRecycle'), {
+    type: 'line',
+    data: {
+      labels: years,
+      datasets: [
+        { label: 'Overall',  data: d.recycling_rate, borderColor: C.green1, fill: true, backgroundColor: C.green1+'18', tension: 0.3, pointRadius: 3 },
+        { label: 'Plastic',  data: d.plastic_rate,   borderColor: '#4ecdc4', fill: false, tension: 0.3, pointRadius: 3 },
+        { label: 'Paper',    data: d.paper_rate,     borderColor: '#45b7d1', fill: false, tension: 0.3, pointRadius: 3, borderDash: [4,2] },
+        { label: 'Glass',    data: d.glass_rate,     borderColor: '#96ceb4', fill: false, tension: 0.3, pointRadius: 3 },
+      ],
+    },
+    options: {
+      scales: { x: { grid: gridOpts() }, y: { grid: gridOpts(), max: 100, ticks: { callback: v=>v+'%' } } },
+      plugins: { legend: { labels: { color: C.textsec } } },
+    },
+    plugins: [darkPlugin()],
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+//  MATERIALS
+// ══════════════════════════════════════════════════════════
+function initMaterials() {
+  const sel = document.getElementById('mf-year-sel');
+  if (!sel.options.length) {
+    const years = [...new Set(DATA.mat_flows.map(d=>d.year))].sort((a,b)=>b-a);
+    years.forEach(y => {
+      const opt = document.createElement('option');
+      opt.value = y; opt.text = y; sel.appendChild(opt);
+    });
+  }
+  updateMaterial();
+}
+
+function updateMaterial() {
+  const yr  = +document.getElementById('mf-year-sel').value;
+  const mat = document.getElementById('mf-mat-sel').value;
+
+  const rows = DATA.mat_flows
+    .filter(d => d.year === yr && d.material === mat)
+    .sort((a,b) => (a.recycle_pct||0) - (b.recycle_pct||0));
+
+  destroyChart('mf-chart');
+  activeCharts['mf-chart'] = new Chart(document.getElementById('mf-chart'), {
+    type: 'bar',
+    data: {
+      labels: rows.map(d => d.country),
+      datasets: [{ label: mat.charAt(0).toUpperCase()+mat.slice(1)+' Recycling %',
+        data: rows.map(d => d.recycle_pct || 0),
+        backgroundColor: MAT_C[mat]+'cc',
+        borderColor: MAT_C[mat],
+        borderWidth: 1, borderRadius: 3,
+      }],
+    },
+    options: {
+      indexAxis: 'y',
+      scales: {
+        x: { grid: gridOpts(), max: 100, ticks: { callback: v=>v+'%' } },
+        y: { grid: gridOpts() },
+      },
+      plugins: { legend: { display: false } },
+    },
+    plugins: [darkPlugin()],
+  });
+
+  // Fate donut — aggregate all countries for selected material+year
+  const allRows = DATA.mat_flows.filter(d => d.year === yr && d.material === mat);
+  const totals = ['recycled_kt','landfilled_kt','incinerated_kt','composted_kt']
+    .map(k => allRows.reduce((s,d) => s+(d[k]||0), 0));
+
+  destroyChart('mf-fate');
+  activeCharts['mf-fate'] = new Chart(document.getElementById('mf-fate'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Recycled','Landfilled','Incinerated','Composted'],
+      datasets: [{ data: totals,
+        backgroundColor: [C.green1, C.danger, C.warn, '#98d8c8'],
+        borderColor: C.bg, borderWidth: 2,
+      }],
+    },
+    options: {
+      cutout: '58%',
+      plugins: { legend: { position:'bottom', labels:{ color:C.textsec, padding:12 } } },
+    },
+    plugins: [darkPlugin()],
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+//  HEATMAP (D3-rendered HTML table)
+// ══════════════════════════════════════════════════════════
+function renderHeatmap() {
+  const container = document.getElementById('heatmap-container');
+  if (container.innerHTML) return;
+
+  const mats = ['overall_rate','plastic_rate','paper_rate','glass_rate','metal_rate','organic_rate','e_waste_rate'];
+  const matLabels = ['Overall','Plastic','Paper','Glass','Metal','Organic','E-Waste'];
+  const rows = DATA.leaderboard.sort((a,b)=>b.overall_rate-a.overall_rate);
+
+  const colorScale = d3.scaleLinear()
+    .domain([0, 35, 70, 100])
+    .range(['#0b0f0e','#00945a','#00c96d','#00ff87']);
+
+  let html = '<table class="hm-table"><thead><tr><th style="text-align:left;min-width:130px">Country</th><th>Region</th>';
+  matLabels.forEach(l => html += `<th style="min-width:65px">${l}</th>`);
+  html += '</tr></thead><tbody>';
+
+  rows.forEach(d => {
+    html += `<tr><td style="color:var(--text);text-align:left;padding:3px 8px">${d.country}</td>`;
+    html += `<td style="color:var(--muted);text-align:center;font-size:9px">${d.region}</td>`;
+    mats.forEach(m => {
+      const v = d[m] || 0;
+      const bg = colorScale(v);
+      const fg = v > 45 ? '#0b0f0e' : '#8ab8a8';
+      html += `<td style="background:${bg};color:${fg};padding:4px 2px">${v.toFixed(0)}%</td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
+
+// ══════════════════════════════════════════════════════════
+//  ANALYTICS
+// ══════════════════════════════════════════════════════════
+let analyticsDone = false;
+function renderAnalytics() {
+  if (analyticsDone) return;
+  analyticsDone = true;
+
+  // Efficiency bubble
+  const eff = DATA.efficiency.slice(0,15);
+  destroyChart('effChart');
+  activeCharts['effChart'] = new Chart(document.getElementById('effChart'), {
+    type: 'bar',
+    data: {
+      labels: eff.map(d=>d.country),
+      datasets: [{
+        label: 'Efficiency Score',
+        data: eff.map(d=>d.efficiency_score),
+        backgroundColor: eff.map(d=>(REGION_C[d.region]||C.muted)+'cc'),
+        borderColor:     eff.map(d=> REGION_C[d.region]||C.muted),
+        borderWidth: 1, borderRadius: 3,
+      }],
+    },
+    options: {
+      indexAxis: 'y',
+      scales: { x: { grid: gridOpts(), max: 80 }, y: { grid: gridOpts() } },
+      plugins: { legend: { display: false } },
+    },
+    plugins: [darkPlugin()],
+  });
+
+  // Scatter GDP vs waste
+  const regions = [...new Set(DATA.countries.map(d=>d.region))];
+  const scatterDatasets = regions.map(r => {
+    const pts = DATA.countries.filter(d=>d.region===r);
+    return {
+      label: r,
+      data: pts.map(d=>{ return { x: d.gdp_per_capita, y: d.total_waste_kg_cap, label: d.country }; }),
+      backgroundColor: (REGION_C[r]||C.muted)+'99',
+      borderColor: REGION_C[r]||C.muted,
+      pointRadius: 7, pointHoverRadius: 9,
+    };
+  });
+  destroyChart('scatterChart');
+  activeCharts['scatterChart'] = new Chart(document.getElementById('scatterChart'), {
+    type: 'scatter',
+    data: { datasets: scatterDatasets },
+    options: {
+      scales: {
+        x: { grid: gridOpts(), title: { display:true, text:'GDP per Capita (USD)', color:C.muted } },
+        y: { grid: gridOpts(), title: { display:true, text:'Waste (kg/cap/yr)',    color:C.muted } },
+      },
+      plugins: {
+        legend: { labels: { color: C.textsec } },
+        tooltip: { callbacks: { label: ctx => `${ctx.raw.label}: ${ctx.raw.y}kg / ${ctx.raw.x.toLocaleString()} GDP` } },
+      },
+    },
+    plugins: [darkPlugin()],
+  });
+
+  // Global trend
+  const gs = DATA.global_summary;
+  destroyChart('globalTrendChart');
+  activeCharts['globalTrendChart'] = new Chart(document.getElementById('globalTrendChart'), {
+    type: 'line',
+    data: {
+      labels: gs.map(d=>d.year),
+      datasets: [
+        { label: 'Avg Waste (kg/cap)', data: gs.map(d=>d.avg_waste_kg_cap), borderColor: C.warn, fill: false, tension:0.3, yAxisID:'y' },
+        { label: 'Min Waste',          data: gs.map(d=>d.min_waste),         borderColor: C.green1, fill:false, tension:0.3, yAxisID:'y', borderDash:[4,2] },
+        { label: 'Max Waste',          data: gs.map(d=>d.max_waste),         borderColor: C.danger, fill:false, tension:0.3, yAxisID:'y', borderDash:[4,2] },
+      ],
+    },
+    options: {
+      scales: { x: { grid: gridOpts() }, y: { grid: gridOpts() } },
+      plugins: { legend: { labels: { color: C.textsec } } },
+    },
+    plugins: [darkPlugin()],
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  renderOverview();
+});
+</script>
+</body>
+</html>
